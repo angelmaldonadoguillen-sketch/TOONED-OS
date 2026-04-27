@@ -1402,7 +1402,7 @@ function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], pa
             const pm = payConfig.find(m => m.id === payment);
             const payStatus = pm && pm.envio > 0 ? `${payment}-pending` : payment;
             onOrderCreated({
-              n: nextOrderNumber, cliente: cliente.nombre, phone: cliente.contacto, ciudad: cliente.ciudad, canal: cliente.canal,
+              n: nextOrderNumber, cliente: cliente.nombre, phone: cliente.contacto, ciudad: cliente.ciudad, canal: cliente.canal, direccion: cliente.direccion || '',
               items: items.map(i => ({ c: i.c, s: i.s, d: i.d, q: i.q })),
               pay: payment, total: totals.precio,
               estado: 'sin-empezar', payStatus,
@@ -1531,7 +1531,7 @@ function Step1Cliente({ cliente, setCliente, clients = [], onClientCreated }) {
             </span>
             {!savedMsg && (
               <button className="btn sm" style={{ borderColor: 'var(--ok)', color: 'var(--ok)' }} onClick={() => {
-                onClientCreated({ phone: cliente.contacto, nombre: cliente.nombre, ciudad: cliente.ciudad, canal: cliente.canal, notas: '', creado: new Date().toISOString().slice(0,10) });
+                onClientCreated({ phone: cliente.contacto, nombre: cliente.nombre, ciudad: cliente.ciudad, canal: cliente.canal, direccion: cliente.direccion || '', notas: '', creado: new Date().toISOString().slice(0,10) });
                 setSavedMsg(true);
                 setTimeout(() => setSavedMsg(false), 3000);
               }}>
@@ -3503,7 +3503,7 @@ function Clientes({ clients, setClients, orders }) {
 }
 
 function ClienteForm({ original, data, onSave, onCancel }) {
-  const [f, setF] = useState(data || { phone: '', nombre: '', ciudad: '', canal: 'Instagram', notas: '' });
+  const [f, setF] = useState(data || { phone: '', nombre: '', ciudad: '', canal: 'Instagram', direccion: '', notas: '' });
   const canSave = f.phone.trim() && f.nombre.trim() && f.ciudad;
 
   return (
@@ -3535,6 +3535,10 @@ function ClienteForm({ original, data, onSave, onCancel }) {
               <button key={ch} className={f.canal === ch ? 'on' : ''} onClick={() => setF({...f, canal: ch})}>{ch}</button>
             ))}
           </div>
+        </div>
+        <div className="field" style={{ gridColumn: '1 / -1' }}>
+          <label>Dirección / punto de referencia</label>
+          <input className="input" placeholder="Col. Palmira, casa #342, calle principal..." value={f.direccion || ''} onChange={e => setF({...f, direccion: e.target.value})} />
         </div>
         <div className="field" style={{ gridColumn: '1 / -1' }}>
           <label>Notas</label>
@@ -3839,14 +3843,14 @@ function App() {
       setClients(prev => {
         const existing = prev.find(c => c.phone === order.phone);
         if (existing) {
-          // Update with latest canal/ciudad
-          return prev.map(c => c.phone === order.phone ? { ...c, nombre: order.cliente || c.nombre, ciudad: order.ciudad || c.ciudad, canal: order.canal || c.canal } : c);
+          return prev.map(c => c.phone === order.phone ? { ...c, nombre: order.cliente || c.nombre, ciudad: order.ciudad || c.ciudad, canal: order.canal || c.canal, direccion: order.direccion || c.direccion || '' } : c);
         }
         return [{
           phone: order.phone,
           nombre: order.cliente,
           ciudad: order.ciudad,
           canal: order.canal,
+          direccion: order.direccion || '',
           notas: '',
           creado: order.fecha || new Date().toISOString().slice(0,10),
         }, ...prev];

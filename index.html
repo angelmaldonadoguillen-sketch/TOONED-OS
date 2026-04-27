@@ -3882,12 +3882,25 @@ function App() {
   const [stock, setStock] = useS(seedStock);
   const [dtfStock, setDtfStock] = useS(DTF_STOCK);
   const [designs, setDesigns] = useS(CATALOG);
-  const [invReady, setInvReady] = useS(false);
   const invTimer = React.useRef(null);
-  const invFirstLoad = React.useRef(true);
+  // Ref always holds the latest inventory snapshot — safe to read inside async callbacks
+  const invSnap = React.useRef({ prendas, stock, designs, dtfSizes, dtfStock });
+  invSnap.current = { prendas, stock, designs, dtfSizes, dtfStock };
+  // Set to true synchronously once Firebase has loaded (never reset)
+  const invReadyRef = React.useRef(false);
 
-  const addStock = (key, delta) => setStock(prev => ({ ...prev, [key]: Math.max(0, (prev[key] || 0) + delta) }));
-  const setStockVal = (key, val) => setStock(prev => ({ ...prev, [key]: Math.max(0, val) }));
+  // Explicit save — only called from real user actions, never from Firebase load
+  const scheduleInvSave = () => {
+    if (!invReadyRef.current) return;
+    clearTimeout(invTimer.current);
+    invTimer.current = setTimeout(() => {
+      window.db.collection('data').doc('inventory').set(invSnap.current)
+        .catch(e => console.warn('Inv save:', e));
+    }, 2000);
+  };
+
+  const addStock   = (key, delta) => { setStock(prev => ({ ...prev, [key]: Math.max(0, (prev[key] || 0) + delta) })); scheduleInvSave(); };
+  const setStockVal = (key, val)  => { setStock(prev => ({ ...prev, [key]: Math.max(0, val) })); scheduleInvSave(); };
 
   // ── Firebase: cargar datos al iniciar ──
   useE(() => {
@@ -3912,7 +3925,7 @@ function App() {
         if (d.dtfSizes?.length) setDtfSizes(d.dtfSizes);
         if (d.dtfStock?.length) setDtfStock(d.dtfStock);
       }
-    }).catch(e => console.warn('Firebase load:', e)).finally(() => { setFbReady(true); setInvReady(true); });
+    }).catch(e => console.warn('Firebase load:', e)).finally(() => { setFbReady(true); invReadyRef.current = true; });
   }, []);
 
   // ── Firebase: guardar con debounce al cambiar datos ──
@@ -3925,17 +3938,8 @@ function App() {
   useE(() => { if (fbReady) fbSave('orders',  { items: orders }); },    [orders,  fbReady]);
   useE(() => { if (fbReady) fbSave('clients', { items: clients }); },   [clients, fbReady]);
   useE(() => { if (fbReady) fbSave('config',  { payConfig, designCats }); }, [payConfig, designCats, fbReady]);
-  useE(() => {
-    if (!invReady) return;
-    // Skip the very first fire (right when Firebase finishes loading) to avoid
-    // overwriting freshly-loaded data with stale default state.
-    if (invFirstLoad.current) { invFirstLoad.current = false; return; }
-    clearTimeout(invTimer.current);
-    invTimer.current = setTimeout(() => {
-      window.db.collection('data').doc('inventory').set({ prendas, stock, designs, dtfSizes, dtfStock })
-        .catch(e => console.warn('Inv save:', e));
-    }, 2000);
-  }, [prendas, stock, designs, dtfSizes, dtfStock, invReady]);
+  // Inventory saves are now EXPLICIT (scheduleInvSave) — never triggered reactively
+  // to avoid overwriting Firebase with stale defaults during page load.
 
   useE(() => { localStorage.setItem('tooned-route', route); }, [route]);
 
@@ -4005,6 +4009,7 @@ function App() {
         ));
       }
     });
+    scheduleInvSave();
     // Auto-save/update client by phone
     if (order.phone) {
       setClients(prev => {
@@ -4045,6 +4050,7 @@ function App() {
           ));
         }
       });
+      scheduleInvSave();
     }
     setOrders(prev => prev.map(o => o.n === n ? { ...o, ...patch } : o));
   };
@@ -4070,6 +4076,7 @@ function App() {
         });
       }
     });
+    scheduleInvSave();
     setOrders(prev => prev.filter(o => o.n !== n));
   };
 
@@ -4223,7 +4230,15 @@ function App() {
           {route === 'nueva'      && <NuevaVenta key={orderKey} onOrderCreated={(o) => handleOrderCreated(o)} onReset={() => { setOrderKey(k => k + 1); setRoute('nueva'); }} nextOrderNumber={nextOrderNumber} clients={clients} payConfig={payConfig} onClientCreated={(c) => setClients(prev => prev.find(x => x.phone === c.phone) ? prev : [c, ...prev])} prendas={prendas} designs={designs} dtfStock={dtfStock} />}
           {route === 'ventas'     && <Ventas orders={orders} onOrderUpdate={handleOrderUpdate} onOrderDelete={handleDeleteOrder} payConfig={payConfig} designs={designs} prendas={prendas} />}
           {route === 'clientes'   && <Clientes clients={clients} setClients={setClients} orders={orders} />}
-          {route === 'inventario' && <Inventario prendas={prendas} setPrendas={setPrendas} dtfSizes={dtfSizes} setDtfSizes={setDtfSizes} stock={stock} addStock={addStock} setStockVal={setStockVal} dtfStock={dtfStock} setDtfStock={setDtfStock} designs={designs} setDesigns={setDesigns} designCats={designCats} setDesignCats={setDesignCats} setOrders={setOrders} />}
+          {route === 'inventario' && <Inventario
+              prendas={prendas}   setPrendas={(v)   => { setPrendas(v);   scheduleInvSave(); }}
+              dtfSizes={dtfSizes} setDtfSizes={(v)  => { setDtfSizes(v);  scheduleInvSave(); }}
+              stock={stock}       addStock={addStock} setStockVal={setStockVal}
+              dtfStock={dtfStock} setDtfStock={(v)  => { setDtfStock(v);  scheduleInvSave(); }}
+              designs={designs}   setDesigns={(v)   => { setDesigns(v);   scheduleInvSave(); }}
+              designCats={designCats} setDesignCats={setDesignCats}
+              setOrders={setOrders}
+            />}
           {route === 'metricas'   && <Metricas orders={orders} />}
           {route === 'config'     && <Configuracion payConfig={payConfig} setPayConfig={setPayConfig} />}
         </div>

@@ -3806,6 +3806,26 @@ function App() {
 
   const nextOrderNumber = Math.max(1049, ...orders.map(o => o.n)) + 1;
 
+  // ── Ticker stats — calculados desde datos reales ──
+  const tickerStats = React.useMemo(() => {
+    const now = new Date();
+    const mesLabel = now.toLocaleDateString('es-HN', { month: 'short', year: '2-digit' }).toUpperCase().replace('. ', ' ');
+    const thisMonth = o => {
+      const d = new Date(o.fecha);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    };
+    const monthOrders = orders.filter(thisMonth);
+    const ventaMes = monthOrders.reduce((a, o) => a + (o.total || 0), 0);
+    const gananciaMes = monthOrders.reduce((a, o) => {
+      const inv = (o.items || []).reduce((s, i) => s + ((i.shirtCost || 0) + (i.dtfCost || 0)) * (i.q || 1), 0);
+      return a + (o.total || 0) - inv - (o.comision || 0);
+    }, 0);
+    const lowThreshold = 3;
+    const stockBajo = Object.values(stock).filter(v => v > 0 && v <= lowThreshold).length;
+    const boxfulPend = orders.filter(o => o.payStatus === 'boxful-pending' && !['rebotado','perdido'].includes(o.estado)).length;
+    return { mesLabel, ventaMes, gananciaMes, stockBajo, boxfulPend };
+  }, [orders, stock]);
+
   const handleOrderCreated = (order) => {
     setOrders(prev => [order, ...prev]);
     // Auto-save/update client by phone
@@ -3982,13 +4002,13 @@ function App() {
           <span className="sep">·</span>
           <span className="item">PRÓX. ORDEN <span className="v">#{nextOrderNumber}</span></span>
           <span className="sep">·</span>
-          <span className="item">ABR 26 · VENTA <span className="v">L 34,450</span></span>
+          <span className="item">{tickerStats.mesLabel} · VENTA <span className="v">{L(tickerStats.ventaMes)}</span></span>
           <span className="sep">·</span>
-          <span className="item">GANANCIA <span className="v">L 13,230</span></span>
+          <span className="item">GANANCIA <span className="v" style={{color: tickerStats.gananciaMes >= 0 ? 'var(--ok)' : 'var(--accent)'}}>{L(tickerStats.gananciaMes)}</span></span>
           <span className="sep">·</span>
-          <span className="item">STOCK BAJO <span className="v" style={{color:'var(--warn)'}}>7 SKU</span></span>
+          <span className="item">STOCK BAJO <span className="v" style={{color: tickerStats.stockBajo > 0 ? 'var(--warn)' : 'var(--muted)'}}>{tickerStats.stockBajo} SKU</span></span>
           <span className="sep">·</span>
-          <span className="item">BOXFUL PEND <span className="v">3</span></span>
+          <span className="item">BOXFUL PEND <span className="v" style={{color: tickerStats.boxfulPend > 0 ? 'var(--warn)' : 'var(--muted)'}}>{tickerStats.boxfulPend}</span></span>
         </div>
 
         <div className="topbar">

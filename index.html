@@ -3859,6 +3859,7 @@ function App() {
   const [designs, setDesigns] = useS(CATALOG);
   const [invReady, setInvReady] = useS(false);
   const invTimer = React.useRef(null);
+  const invFirstLoad = React.useRef(true);
 
   const addStock = (key, delta) => setStock(prev => ({ ...prev, [key]: Math.max(0, (prev[key] || 0) + delta) }));
   const setStockVal = (key, val) => setStock(prev => ({ ...prev, [key]: Math.max(0, val) }));
@@ -3901,6 +3902,9 @@ function App() {
   useE(() => { if (fbReady) fbSave('config',  { payConfig, designCats }); }, [payConfig, designCats, fbReady]);
   useE(() => {
     if (!invReady) return;
+    // Skip the very first fire (right when Firebase finishes loading) to avoid
+    // overwriting freshly-loaded data with stale default state.
+    if (invFirstLoad.current) { invFirstLoad.current = false; return; }
     clearTimeout(invTimer.current);
     invTimer.current = setTimeout(() => {
       window.db.collection('data').doc('inventory').set({ prendas, stock, designs, dtfSizes, dtfStock })

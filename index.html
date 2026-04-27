@@ -1338,7 +1338,7 @@ function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], pa
     const shirtCost = colorObj?.cost ?? 215;
     const isNone = pendingDesign === '__none__';
     const d = isNone ? null : designs.find(x => x.id === pendingDesign);
-    const dtfCost = isNone ? 0 : (d?.pricing?.[pendingSize]?.costo || d?.cost || 0);
+    const dtfCost = isNone ? 0 : getDesignCost(d);
     setItems(prev => [...prev, { id: crypto.randomUUID().slice(0, 6), p: pendingPrenda, c: pendingColor, s: pendingSize, d: pendingDesign, q: 1, shirtCost, dtfCost }]);
     setPendingDesign(null);
   };
@@ -1545,6 +1545,16 @@ function Step1Cliente({ cliente, setCliente, clients = [], onClientCreated }) {
   );
 }
 
+const getDesignCost = (d) => {
+  if (!d) return 0;
+  if (d.cost > 0) return d.cost;
+  if (d.pricing) {
+    const vals = Object.values(d.pricing).map(p => p.costo || 0).filter(v => v > 0);
+    if (vals.length) return Math.min(...vals);
+  }
+  return 0;
+};
+
 function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPendingColor, pendingSize, setPendingSize, pendingDesign, setPendingDesign, addItem, items, removeItem, updateItemQty, prendas = PRENDAS, designs = CATALOG, dtfStock = DTF_STOCK }) {
   const prendaObj = prendas.find(p => p.id === pendingPrenda);
   const availableColors = prendaObj ? prendaObj.colors : [];
@@ -1624,7 +1634,7 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
               </div>
               {designs.map(d => {
                 const stk = dtfStock.filter(s => s.design === d.id).reduce((a, s) => a + s.qty, 0);
-                const costForSize = pendingSize && d.pricing?.[pendingSize]?.costo ? d.pricing[pendingSize].costo : (d.cost || 0);
+                const cost = getDesignCost(d);
                 return (
                   <div key={d.id} className={`catalog-card ${pendingDesign === d.id ? 'on' : ''}`} onClick={() => setPendingDesign(d.id)}>
                     <div className="thumb">
@@ -1637,7 +1647,7 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
                       <span className="sku-tag">{d.tag}</span>
                     </div>
                     <div className="cat-cost" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>{d.id}{costForSize > 0 ? ` · DTF ${L(costForSize)}` : ''}</span>
+                      <span>{d.id}{cost > 0 ? ` · DTF ${L(cost)}` : ''}</span>
                       <span style={{ color: stk > 0 ? 'var(--ok)' : 'var(--dim)' }}>{stk > 0 ? `● ${stk} stk` : '○ 0 stk'}</span>
                     </div>
                   </div>
@@ -3354,6 +3364,16 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
                 </div>
                 {isEditing && (
                   <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+                    <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Precio venta base (usado en órdenes)</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                      <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>L</span>
+                      <input type="number" min="0" className="mono"
+                        value={d.cost || ''}
+                        placeholder="0"
+                        onChange={e => setDesigns(prev => prev.map(x => x.id === d.id ? { ...x, cost: Number(e.target.value) || 0 } : x))}
+                        style={{ width: 90, padding: '5px 8px', background: '#0B0B0B', border: '1px solid var(--accent)', color: 'var(--ok)', fontSize: 13, outline: 'none', fontWeight: 700 }} />
+                      <span className="mono" style={{ fontSize: 10, color: 'var(--dim)' }}>precio que aparece al crear una venta</span>
+                    </div>
                     <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Miniatura</div>
                     <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                       <div

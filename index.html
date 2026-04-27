@@ -1013,7 +1013,7 @@ const PAY_CONFIG_DEFAULT = [
   { id: 'efectivo',  label: 'Efectivo',          sub: 'Entrega en mano',      envio: 0,   comisionPct: 0  },
 ];
 
-const CITIES = ['Tegucigalpa', 'San Pedro Sula', 'La Ceiba', 'Choluteca', 'Comayagua', 'Danlí', 'Siguatepeque', 'El Progreso', 'Juticalpa', 'Tela'];
+const CITIES = ['Atlántida','Choluteca','Colón','Comayagua','Copán','Cortés','El Paraíso','Francisco Morazán','Gracias a Dios','Intibucá','Islas de la Bahía','La Paz','Lempira','Ocotepeque','Olancho','Santa Bárbara','Valle','Yoro'];
 
 // DTF catalog — CATALOG is the design library. DTF_STOCK tracks pre-printed units.
 const DTF_SIZES = ['A5', 'A4', 'A4+', 'A3', 'A3+', 'A2'];
@@ -1499,7 +1499,7 @@ function Step1Cliente({ cliente, setCliente, clients = [], onClientCreated }) {
           <input className="input" placeholder="Ej. María Fernanda Pérez" value={cliente.nombre} onChange={e => setCliente(c => ({ ...c, nombre: e.target.value }))} />
         </div>
         <div className="field">
-          <label>Ciudad <span className="req">*</span></label>
+          <label>Departamento <span className="req">*</span></label>
           <select className="select" value={cliente.ciudad} onChange={e => setCliente(c => ({ ...c, ciudad: e.target.value }))}>
             <option value="">— Seleccionar —</option>
             {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -2335,7 +2335,7 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete }) {
                     <h2>TOONED HN</h2>
                     <div class="sub">Pedido #${o.n} · ${o.fecha} · ${o.canal}</div>
                     <div class="row"><span class="label">Cliente</span><span>${o.cliente}</span></div>
-                    <div class="row"><span class="label">Ciudad</span><span>${o.ciudad}</span></div>
+                    <div class="row"><span class="label">Departamento</span><span>${o.ciudad}</span></div>
                     <div class="row"><span class="label">Estado</span><span>${STATUS_LABELS[o.estado] || o.estado}</span></div>
                     <hr/>
                     <div style="font-size:11px;color:#666;font-weight:700;margin-bottom:8px">PIEZAS</div>
@@ -2356,7 +2356,7 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete }) {
               <div className="panel-body">
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                   <div><div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.12em' }}>CLIENTE</div><div style={{ fontWeight: 600, marginTop: 4 }}>{o.cliente}</div></div>
-                  <div><div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.12em' }}>CIUDAD</div><div style={{ fontWeight: 600, marginTop: 4 }}>{o.ciudad}</div></div>
+                  <div><div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.12em' }}>DEPTO</div><div style={{ fontWeight: 600, marginTop: 4 }}>{o.ciudad}</div></div>
                   <div><div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.12em' }}>CANAL</div><div style={{ fontWeight: 600, marginTop: 4 }}>{o.canal}</div></div>
                   <div><div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.12em' }}>FECHA</div><div style={{ fontWeight: 600, marginTop: 4 }} className="mono">{o.fecha}</div></div>
                 </div>
@@ -3459,7 +3459,7 @@ function Clientes({ clients, setClients, orders }) {
             <tr>
               <th>Teléfono · ID</th>
               <th>Cliente</th>
-              <th>Ciudad</th>
+              <th>Departamento</th>
               <th>Canal</th>
               <th style={{ textAlign: 'right' }}>Pedidos</th>
               <th style={{ textAlign: 'right' }}>Total</th>
@@ -3512,7 +3512,7 @@ function ClienteForm({ original, data, onSave, onCancel }) {
           <input className="input" value={f.nombre} onChange={e => setF({...f, nombre: e.target.value})} />
         </div>
         <div className="field">
-          <label>Ciudad <span className="req">*</span></label>
+          <label>Departamento <span className="req">*</span></label>
           <select className="select" value={f.ciudad} onChange={e => setF({...f, ciudad: e.target.value})}>
             <option value="">— Seleccionar —</option>
             {CITIES.map(c => <option key={c} value={c}>{c}</option>)}

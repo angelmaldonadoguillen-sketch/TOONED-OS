@@ -1303,7 +1303,7 @@ Object.assign(window, { Icon, StatusBadge, PayBadge, ColorDot, fmtItems, sumOrde
 </script>
 <script type="text/babel">
 // Nueva Venta — multi-step flow
-function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], payConfig = PAY_CONFIG_DEFAULT, onClientCreated }) {
+function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], payConfig = PAY_CONFIG_DEFAULT, onClientCreated, prendas = PRENDAS, designs = CATALOG, dtfStock = DTF_STOCK }) {
   const [step, setStep] = useState(1);
   const [cliente, setCliente] = useState({ nombre: '', contacto: '', ciudad: '', canal: 'Instagram', direccion: '' });
 
@@ -1333,12 +1333,12 @@ function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], pa
 
   const addItem = () => {
     if (!pendingPrenda || !pendingColor || !pendingSize || !pendingDesign) return;
-    const p = PRENDAS.find(x => x.id === pendingPrenda);
-    const colorObj = p.colors.find(c => c.id === pendingColor);
+    const p = prendas.find(x => x.id === pendingPrenda);
+    const colorObj = p?.colors.find(c => (c.uid || c.id) === pendingColor || c.id === pendingColor);
     const shirtCost = colorObj?.cost ?? 215;
     const isNone = pendingDesign === '__none__';
-    const d = isNone ? null : CATALOG.find(x => x.id === pendingDesign);
-    const dtfCost = isNone ? 0 : (d?.cost || 0);
+    const d = isNone ? null : designs.find(x => x.id === pendingDesign);
+    const dtfCost = isNone ? 0 : (d?.pricing?.[pendingSize]?.costo || d?.cost || 0);
     setItems(prev => [...prev, { id: crypto.randomUUID().slice(0, 6), p: pendingPrenda, c: pendingColor, s: pendingSize, d: pendingDesign, q: 1, shirtCost, dtfCost }]);
     setPendingDesign(null);
   };
@@ -1388,10 +1388,11 @@ function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], pa
           pendingSize={pendingSize} setPendingSize={setPendingSize}
           pendingDesign={pendingDesign} setPendingDesign={setPendingDesign}
           addItem={addItem} items={items} removeItem={removeItem} updateItemQty={updateItemQty}
+          prendas={prendas} designs={designs} dtfStock={dtfStock}
         />
       )}
       {step === 3 && (
-        <Step3Pago payment={payment} setPayment={setPayment} totals={totals} payConfig={payConfig} precioTotal={precioTotal} setPrecioTotal={setPrecioTotal} />
+        <Step3Pago payment={payment} setPayment={setPayment} totals={totals} payConfig={payConfig} precioTotal={precioTotal} setPrecioTotal={setPrecioTotal} items={items} prendas={prendas} designs={designs} />
       )}
       {step === 4 && (
         <Step4Resumen
@@ -1544,8 +1545,8 @@ function Step1Cliente({ cliente, setCliente, clients = [], onClientCreated }) {
   );
 }
 
-function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPendingColor, pendingSize, setPendingSize, pendingDesign, setPendingDesign, addItem, items, removeItem, updateItemQty }) {
-  const prendaObj = PRENDAS.find(p => p.id === pendingPrenda);
+function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPendingColor, pendingSize, setPendingSize, pendingDesign, setPendingDesign, addItem, items, removeItem, updateItemQty, prendas = PRENDAS, designs = CATALOG, dtfStock = DTF_STOCK }) {
+  const prendaObj = prendas.find(p => p.id === pendingPrenda);
   const availableColors = prendaObj ? prendaObj.colors : [];
   const availableSizes = prendaObj ? prendaObj.sizes : [];
 
@@ -1564,7 +1565,7 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
               A · Prenda
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
-              {PRENDAS.map(p => (
+              {prendas.map(p => (
                 <button key={p.id}
                   onClick={() => setPendingPrenda(p.id)}
                   style={{
@@ -1611,7 +1612,7 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
           <div style={{ opacity: pendingPrenda && pendingColor && pendingSize ? 1 : 0.35, pointerEvents: pendingPrenda && pendingColor && pendingSize ? 'auto' : 'none' }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 10, display: 'flex', justifyContent: 'space-between' }}>
               <span>D · Diseño DTF del catálogo</span>
-              <span className="dim">{CATALOG.length} DISEÑOS</span>
+              <span className="dim">{designs.length} DISEÑOS</span>
             </div>
             <div className="catalog-grid">
               {/* Sin diseño */}
@@ -1621,18 +1622,23 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
                 <div className="nm"><span>Sin diseño</span></div>
                 <div className="cat-cost"><span style={{ color: 'var(--dim)' }}>Solo prenda · Sin DTF</span></div>
               </div>
-              {CATALOG.map(d => {
-                const stock = DTF_STOCK.filter(s => s.design === d.id).reduce((a, s) => a + s.qty, 0);
+              {designs.map(d => {
+                const stk = dtfStock.filter(s => s.design === d.id).reduce((a, s) => a + s.qty, 0);
+                const costForSize = pendingSize && d.pricing?.[pendingSize]?.costo ? d.pricing[pendingSize].costo : (d.cost || 0);
                 return (
                   <div key={d.id} className={`catalog-card ${pendingDesign === d.id ? 'on' : ''}`} onClick={() => setPendingDesign(d.id)}>
-                    <div className="thumb"><CatThumb id={d.id} /></div>
+                    <div className="thumb">
+                      {d.thumb
+                        ? <img src={d.thumb} alt={d.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <CatThumb id={d.id} />}
+                    </div>
                     <div className="nm">
                       <span>{d.name}</span>
                       <span className="sku-tag">{d.tag}</span>
                     </div>
                     <div className="cat-cost" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>{d.id} · DTF {L(d.cost)}</span>
-                      <span style={{ color: stock > 0 ? 'var(--ok)' : 'var(--dim)' }}>{stock > 0 ? `● ${stock} stk` : '○ 0 stk'}</span>
+                      <span>{d.id}{costForSize > 0 ? ` · DTF ${L(costForSize)}` : ''}</span>
+                      <span style={{ color: stk > 0 ? 'var(--ok)' : 'var(--dim)' }}>{stk > 0 ? `● ${stk} stk` : '○ 0 stk'}</span>
                     </div>
                   </div>
                 );
@@ -1658,8 +1664,8 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
           )}
           {items.map((i, idx) => {
             const c = SHIRT_COLORS.find(x => x.id === i.c);
-            const d = i.d === '__none__' ? { name: 'Sin diseño' } : CATALOG.find(x => x.id === i.d);
-            const p = PRENDAS.find(x => x.id === i.p);
+            const d = i.d === '__none__' ? { name: 'Sin diseño' } : designs.find(x => x.id === i.d);
+            const p = prendas.find(x => x.id === i.p);
             return (
               <div key={i.id} className="line-item" style={{ gridTemplateColumns: '36px 1fr auto auto 28px', gap: 8 }}>
                 <div className="idx">#{(idx + 1).toString().padStart(2, '0')}</div>
@@ -1696,7 +1702,7 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
   );
 }
 
-function Step3Pago({ payment, setPayment, totals, payConfig = PAY_CONFIG_DEFAULT, precioTotal, setPrecioTotal }) {
+function Step3Pago({ payment, setPayment, totals, payConfig = PAY_CONFIG_DEFAULT, precioTotal, setPrecioTotal, items = [], prendas = PRENDAS, designs = CATALOG }) {
   const pm = payConfig.find(m => m.id === payment);
   const hasEnvio = pm && pm.envio > 0;
   const hasComision = pm && pm.comisionPct > 0;
@@ -1830,8 +1836,8 @@ function Step4Resumen({ orderN, cliente, items, payment, totals, onConfirm, onRe
           <div style={{ padding: '4px 16px 16px' }}>
             {items.map((i, idx) => {
               const c = SHIRT_COLORS.find(x => x.id === i.c);
-              const d = i.d === '__none__' ? { name: 'Sin diseño', cost: 0 } : CATALOG.find(x => x.id === i.d);
-              const p = PRENDAS.find(x => x.id === i.p);
+              const d = i.d === '__none__' ? { name: 'Sin diseño', cost: 0 } : designs.find(x => x.id === i.d);
+              const p = prendas.find(x => x.id === i.p);
               return (
                 <div key={i.id} className="line-item" style={{ marginTop: 8 }}>
                   <div className="idx">{(idx + 1).toString().padStart(2, '0')}</div>
@@ -4023,7 +4029,7 @@ function App() {
         </div>
 
         <div className="content">
-          {route === 'nueva'      && <NuevaVenta key={orderKey} onOrderCreated={(o) => handleOrderCreated(o)} onReset={() => { setOrderKey(k => k + 1); setRoute('nueva'); }} nextOrderNumber={nextOrderNumber} clients={clients} payConfig={payConfig} onClientCreated={(c) => setClients(prev => prev.find(x => x.phone === c.phone) ? prev : [c, ...prev])} />}
+          {route === 'nueva'      && <NuevaVenta key={orderKey} onOrderCreated={(o) => handleOrderCreated(o)} onReset={() => { setOrderKey(k => k + 1); setRoute('nueva'); }} nextOrderNumber={nextOrderNumber} clients={clients} payConfig={payConfig} onClientCreated={(c) => setClients(prev => prev.find(x => x.phone === c.phone) ? prev : [c, ...prev])} prendas={prendas} designs={designs} dtfStock={dtfStock} />}
           {route === 'ventas'     && <Ventas orders={orders} onOrderUpdate={handleOrderUpdate} onOrderDelete={handleDeleteOrder} payConfig={payConfig} />}
           {route === 'clientes'   && <Clientes clients={clients} setClients={setClients} orders={orders} />}
           {route === 'inventario' && <Inventario prendas={prendas} setPrendas={setPrendas} dtfSizes={dtfSizes} setDtfSizes={setDtfSizes} stock={stock} addStock={addStock} setStockVal={setStockVal} dtfStock={dtfStock} setDtfStock={setDtfStock} designs={designs} setDesigns={setDesigns} designCats={designCats} setDesignCats={setDesignCats} setOrders={setOrders} />}

@@ -1397,7 +1397,7 @@ function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], pa
       {step === 4 && (
         <Step4Resumen
           orderN={nextOrderNumber} cliente={cliente} items={items} payment={payment}
-          totals={totals} payConfig={payConfig}
+          totals={totals} payConfig={payConfig} prendas={prendas} designs={designs}
           onConfirm={() => {
             const pm = payConfig.find(m => m.id === payment);
             const payStatus = pm && pm.envio > 0 ? `${payment}-pending` : payment;
@@ -1800,7 +1800,7 @@ function Step3Pago({ payment, setPayment, totals, payConfig = PAY_CONFIG_DEFAULT
   );
 }
 
-function Step4Resumen({ orderN, cliente, items, payment, totals, onConfirm, onReset, payConfig = PAY_CONFIG_DEFAULT }) {
+function Step4Resumen({ orderN, cliente, items, payment, totals, onConfirm, onReset, payConfig = PAY_CONFIG_DEFAULT, prendas = PRENDAS, designs = CATALOG }) {
   const [confirmed, setConfirmed] = useState(false);
   const pm = payConfig.find(p => p.id === payment);
   const payLabel = pm?.label || '—';

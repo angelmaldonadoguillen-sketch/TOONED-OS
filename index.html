@@ -1606,7 +1606,7 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
             </div>
             <div className="color-swatch-row">
               {availableColors.map(c => (
-                <div key={c.id} className={`color-swatch ${pendingColor === c.id ? 'on' : ''}`} onClick={() => setPendingColor(c.id)}>
+                <div key={c.uid || c.id} className={`color-swatch ${pendingColor === (c.uid || c.id) ? 'on' : ''}`} onClick={() => setPendingColor(c.uid || c.id)}>
                   <div className="chip-c" style={{ background: c.hex, borderColor: c.border }} />
                   <div className="name">{c.name.toUpperCase()}</div>
                   <div className="cost">{L(c.cost)} · COSTO</div>
@@ -4026,6 +4026,26 @@ function App() {
   };
 
   const handleOrderUpdate = (n, patch) => {
+    const order = orders.find(o => o.n === n);
+    if (!order) return;
+    // Restore stock when transitioning TO "rebotado" (only once)
+    if (patch.estado === 'rebotado' && order.estado !== 'rebotado') {
+      order.items?.forEach(i => {
+        if (i.p && i.c && i.s) {
+          const key = makeStockKey(i.p, i.c, i.s);
+          setStock(prev => ({ ...prev, [key]: (prev[key] || 0) + (i.q || 1) }));
+        }
+      });
+      order.items?.forEach(i => {
+        if (i.d && i.d !== '__none__' && i.dtf) {
+          setDtfStock(prev => prev.map(s =>
+            s.design === i.d && s.size === i.dtf
+              ? { ...s, qty: s.qty + (i.q || 1) }
+              : s
+          ));
+        }
+      });
+    }
     setOrders(prev => prev.map(o => o.n === n ? { ...o, ...patch } : o));
   };
 

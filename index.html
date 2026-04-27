@@ -2112,9 +2112,9 @@ Object.assign(window, { Metricas });
 </script>
 <script type="text/babel">
 // Ventas table
-function Ventas({ orders, onOrderUpdate, onOrderDelete }) {
+function Ventas({ orders, onOrderUpdate, onOrderDelete, designs = CATALOG, prendas = PRENDAS }) {
   const [filters, setFilters] = useState({ estado: 'all', pay: 'all', canal: 'all', fecha: 'all', q: '' });
-  const [selected, setSelected] = useState(null);
+  const [modalOrder, setModalOrder] = useState(null);
   const [payMenu, setPayMenu] = useState(null); // { orderN, x, y }
   const [estadoMenu, setEstadoMenu] = useState(null);
 
@@ -2250,9 +2250,8 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete }) {
                   return a + ((c?.cost || 0) + (d?.cost || 0)) * i.q;
                 }, 0);
                 const ganancia = o.total - inversion - (o.comision || 0);
-                const isSel = selected === o.n;
                 return (
-                  <tr key={o.n} className={isSel ? 'selected' : ''} onClick={() => setSelected(isSel ? null : o.n)}>
+                  <tr key={o.n} style={{ cursor: 'pointer' }} onClick={() => setModalOrder(o.n)}>
                     <td className="order-n">#{o.n}</td>
                     <td>
                       <div style={{ fontWeight: 500 }}>{o.cliente}</div>
@@ -2315,102 +2314,204 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete }) {
       <PayMenu menu={payMenu} onClose={() => setPayMenu(null)} onPick={(id) => updatePayStatus(payMenu.orderN, id)} />
       <EstadoMenu menu={estadoMenu} onClose={() => setEstadoMenu(null)} onPick={(id) => updateEstado(estadoMenu.orderN, id)} />
 
-      {selected && (() => {
-        const o = filtered.find(x => x.n === selected);
+      {modalOrder && (() => {
+        const o = orders.find(x => x.n === modalOrder);
         if (!o) return null;
-        const inversion = o.items.reduce((a, i) => {
-          const c = SHIRT_COLORS.find(x => x.id === i.c);
-          const d = i.d === '__none__' ? { cost: 0 } : CATALOG.find(x => x.id === i.d);
-          return a + ((c?.cost || 0) + (d?.cost || 0)) * i.q;
-        }, 0);
         return (
-          <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div className="panel crop">
-              <div className="panel-head">
-                <div className="panel-title">DETALLE · <span className="dim">#{o.n}</span></div>
-                <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => {
-                  const w = window.open('', '_blank', 'width=480,height=640');
-                  const ganLoc = o.total - inversion - (o.comision || 0);
-                  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Pedido #${o.n}</title><style>
-                    body{font-family:monospace;background:#fff;color:#000;padding:24px;font-size:13px;max-width:420px;margin:auto}
-                    h2{font-size:20px;font-weight:900;margin:0 0 4px}
-                    .sub{color:#666;font-size:11px;margin-bottom:20px}
-                    .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}
-                    .row.big{font-weight:700;font-size:15px;border-bottom:2px solid #000;padding-top:10px}
-                    .label{color:#666}
-                    hr{border:none;border-top:1px dashed #ccc;margin:16px 0}
-                    .item{padding:8px 0;border-bottom:1px solid #f0f0f0}
-                    @media print{body{padding:8px}}
-                  </style></head><body>
-                    <h2>TOONED HN</h2>
-                    <div class="sub">Pedido #${o.n} · ${o.fecha} · ${o.canal}</div>
-                    <div class="row"><span class="label">Cliente</span><span>${o.cliente}</span></div>
-                    <div class="row"><span class="label">Departamento</span><span>${o.ciudad}</span></div>
-                    <div class="row"><span class="label">Estado</span><span>${STATUS_LABELS[o.estado] || o.estado}</span></div>
-                    <hr/>
-                    <div style="font-size:11px;color:#666;font-weight:700;margin-bottom:8px">PIEZAS</div>
-                    ${o.items.map(i => { const col=SHIRT_COLORS.find(x=>x.id===i.c); const des=i.d==='__none__'?{name:'Sin diseño'}:CATALOG.find(x=>x.id===i.d); return `<div class="item">${des?.name||'Sin diseño'} · ${col?.name||i.c} · T${i.s} × ${i.q}</div>`; }).join('')}
-                    <hr/>
-                    <div class="row"><span class="label">Subtotal</span><span>L ${o.total.toLocaleString()}</span></div>
-                    <div class="row"><span class="label">Inversión</span><span>L ${inversion.toLocaleString()}</span></div>
-                    ${o.comision ? `<div class="row"><span class="label">Comisión</span><span>-L ${o.comision.toLocaleString()}</span></div>` : ''}
-                    <div class="row big"><span>GANANCIA</span><span>L ${ganLoc.toLocaleString()}</span></div>
-                    <div style="margin-top:24px;font-size:10px;color:#999;text-align:center">TOONED HN · Sistema Operativo Interno</div>
-                  </body></html>`);
-                  w.document.close();
-                  setTimeout(() => w.print(), 300);
-                }}>
-                  <Icon name="dl" size={11} /> Imprimir
-                </button>
-              </div>
-              <div className="panel-body">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                  <div><div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.12em' }}>CLIENTE</div><div style={{ fontWeight: 600, marginTop: 4 }}>{o.cliente}</div></div>
-                  <div><div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.12em' }}>DEPTO</div><div style={{ fontWeight: 600, marginTop: 4 }}>{o.ciudad}</div></div>
-                  <div><div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.12em' }}>CANAL</div><div style={{ fontWeight: 600, marginTop: 4 }}>{o.canal}</div></div>
-                  <div><div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.12em' }}>FECHA</div><div style={{ fontWeight: 600, marginTop: 4 }} className="mono">{o.fecha}</div></div>
-                </div>
-                <hr className="divider" />
-                <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.12em', marginBottom: 8 }}>PIEZAS</div>
-                {o.items.map((i, idx) => {
-                  const c = SHIRT_COLORS.find(x => x.id === i.c);
-                  const d = i.d === '__none__' ? { name: 'Sin diseño', cost: 0 } : CATALOG.find(x => x.id === i.d);
+          <OrderModal
+            order={o}
+            designs={designs}
+            prendas={prendas}
+            onClose={() => setModalOrder(null)}
+            onUpdateEstado={(s) => updateEstado(o.n, s)}
+            onUpdatePay={(s) => { onOrderUpdate(o.n, { payStatus: s }); }}
+            onDelete={() => { onOrderDelete(o.n); setModalOrder(null); }}
+          />
+        );
+      })()}
+    </div>
+  );
+}
+
+function OrderModal({ order: o, designs, prendas, onClose, onUpdateEstado, onUpdatePay, onDelete }) {
+  const inversion = (o.items || []).reduce((a, i) => a + ((i.shirtCost || 0) + (i.dtfCost || 0)) * (i.q || 1), 0);
+  const ganancia = o.total - inversion - (o.comision || 0);
+
+  useEffect(() => {
+    const h = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    document.body.style.overflow = 'hidden';
+    return () => { window.removeEventListener('keydown', h); document.body.style.overflow = ''; };
+  }, []);
+
+  const printReceipt = () => {
+    const w = window.open('', '_blank', 'width=480,height=640');
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Pedido #${o.n}</title><style>
+      body{font-family:monospace;background:#fff;color:#000;padding:24px;font-size:13px;max-width:420px;margin:auto}
+      h2{font-size:20px;font-weight:900;margin:0 0 4px}.sub{color:#666;font-size:11px;margin-bottom:20px}
+      .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}
+      .row.big{font-weight:700;font-size:15px;border-bottom:2px solid #000;padding-top:10px}
+      .label{color:#666}hr{border:none;border-top:1px dashed #ccc;margin:16px 0}
+      .item{padding:8px 0;border-bottom:1px solid #f0f0f0}@media print{body{padding:8px}}
+    </style></head><body>
+      <h2>TOONED HN</h2><div class="sub">Pedido #${o.n} · ${o.fecha} · ${o.canal}</div>
+      <div class="row"><span class="label">Cliente</span><span>${o.cliente}</span></div>
+      <div class="row"><span class="label">Departamento</span><span>${o.ciudad}</span></div>
+      ${o.direccion ? `<div class="row"><span class="label">Dirección</span><span>${o.direccion}</span></div>` : ''}
+      <div class="row"><span class="label">Estado</span><span>${STATUS_LABELS[o.estado] || o.estado}</span></div>
+      <hr/>
+      <div style="font-size:11px;color:#666;font-weight:700;margin-bottom:8px">PIEZAS</div>
+      ${(o.items||[]).map(i => { const des=i.d==='__none__'?{name:'Sin diseño'}:designs.find(x=>x.id===i.d); const col=SHIRT_COLORS.find(x=>x.id===i.c); return `<div class="item">${des?.name||'Sin diseño'} · ${col?.name||i.c} · T${i.s} × ${i.q}</div>`; }).join('')}
+      <hr/>
+      <div class="row"><span class="label">Venta</span><span>L ${o.total.toLocaleString()}</span></div>
+      <div class="row"><span class="label">Inversión</span><span>L ${inversion.toLocaleString()}</span></div>
+      ${o.comision ? `<div class="row"><span class="label">Comisión</span><span>-L ${o.comision.toLocaleString()}</span></div>` : ''}
+      <div class="row big"><span>GANANCIA</span><span>L ${ganancia.toLocaleString()}</span></div>
+      <div style="margin-top:24px;font-size:10px;color:#999;text-align:center">TOONED HN · Sistema Operativo Interno</div>
+    </body></html>`);
+    w.document.close(); setTimeout(() => w.print(), 300);
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card)', border: '1px solid var(--line-2)', width: '100%', maxWidth: 860, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* Header */}
+        <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 14, background: '#0F0F0F', flexShrink: 0 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 22, letterSpacing: '-0.02em' }}>#{o.n}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: 15 }}>{o.cliente}</div>
+            <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.1em', marginTop: 2 }}>{o.ciudad} · {o.canal} · {o.fecha}</div>
+          </div>
+          <StatusBadge s={o.estado} />
+          <PayBadge s={o.payStatus} />
+          <button className="btn sm ghost" onClick={onClose} style={{ marginLeft: 8 }}><Icon name="x" size={13} /></button>
+        </div>
+
+        {/* Body — scrollable */}
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', minHeight: 0 }}>
+
+            {/* Left — items */}
+            <div style={{ padding: '20px 24px', borderRight: '1px solid var(--line)' }}>
+              <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 14 }}>Piezas del pedido · {(o.items||[]).length}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {(o.items || []).map((i, idx) => {
+                  const design = i.d === '__none__' ? null : designs.find(x => x.id === i.d);
+                  const col = SHIRT_COLORS.find(x => x.id === i.c);
+                  const prenda = prendas.find(x => x.id === i.p);
                   return (
-                    <div key={idx} style={{ padding: '10px 0', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13 }}>{d?.name || 'Sin diseño'}</div>
-                        <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.06em', marginTop: 2 }}><ColorDot id={i.c} /> {c?.name.toUpperCase()} · TALLA {i.s} · x{i.q}</div>
+                    <div key={idx} style={{ display: 'flex', gap: 14, padding: '12px 14px', background: '#0B0B0B', border: '1px solid var(--line)', alignItems: 'center' }}>
+                      {/* Thumbnail */}
+                      <div style={{ width: 64, height: 64, flexShrink: 0, background: '#111', border: '1px solid var(--line)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {design?.thumb
+                          ? <img src={design.thumb} alt={design.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : design
+                            ? <CatThumb id={design.id} />
+                            : <span style={{ fontSize: 24, color: 'var(--dim)' }}>∅</span>
+                        }
                       </div>
-                      <div className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>CAM {L(c?.cost || 0)}{d?.cost > 0 ? ` + DTF ${L(d.cost)}` : ''}</div>
+                      {/* Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, letterSpacing: '-0.01em' }}>{design?.name || 'Sin diseño'}</div>
+                        <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3, letterSpacing: '0.06em' }}>
+                          {prenda?.name || 'Prenda'} · <ColorDot id={i.c} /> {col?.name?.toUpperCase() || i.c} · TALLA {i.s}
+                        </div>
+                        {design && <div className="mono" style={{ fontSize: 9, color: 'var(--dim)', marginTop: 2, letterSpacing: '0.08em' }}>{design.id} · {design.tag}</div>}
+                      </div>
+                      {/* Qty + cost */}
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 20 }}>×{i.q}</div>
+                        <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                          {L((i.shirtCost || 0) + (i.dtfCost || 0))} / ud
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
               </div>
             </div>
-            <div className="panel crop">
-              <div className="panel-head"><div className="panel-title">ESTADOS</div></div>
-              <div className="panel-body">
-                <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.12em', marginBottom: 8 }}>ESTADO PEDIDO</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+
+            {/* Right — info + states + summary */}
+            <div style={{ padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+              {/* Client info */}
+              <div>
+                <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 10 }}>Información</div>
+                {[
+                  ['Teléfono', o.phone || '—'],
+                  ['Dirección', o.direccion || '—'],
+                  ['Pago', o.pay],
+                ].map(([k, v]) => (
+                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--line)' }}>
+                    <span className="mono" style={{ fontSize: 10, color: 'var(--muted)' }}>{k}</span>
+                    <span style={{ fontSize: 12, fontWeight: 500, maxWidth: 160, textAlign: 'right', wordBreak: 'break-word' }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Estado */}
+              <div>
+                <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 8 }}>Estado del pedido</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                   {STATUSES.map(s => (
-                    <button key={s} className={`badge ${s}`}
-                      onClick={() => updateEstado(o.n, s)}
-                      style={{ cursor: 'pointer', opacity: s === o.estado ? 1 : 0.35, padding: '5px 10px', transition: 'opacity 0.15s' }}>
+                    <button key={s} className={`badge ${s}`} onClick={() => onUpdateEstado(s)}
+                      style={{ cursor: 'pointer', opacity: s === o.estado ? 1 : 0.3, padding: '5px 10px', transition: 'opacity 0.15s' }}>
                       <span className="pip" />{STATUS_LABELS[s]}
                     </button>
                   ))}
                 </div>
-                <hr className="divider" />
-                <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.12em', marginBottom: 8 }}>LIQUIDACIÓN</div>
-                <div className="summary-row"><span className="l">Venta</span><span className="r mono">{L(o.total)}</span></div>
-                <div className="summary-row"><span className="l">Inversión</span><span className="r mono" style={{ color: 'var(--warn)' }}>−{L(inversion)}</span></div>
-                <div className="summary-row"><span className="l">Comisión Boxful</span><span className="r mono" style={{ color: 'var(--warn)' }}>{o.comision ? '−' + L(o.comision) : '—'}</span></div>
-                <div className="summary-row big positive"><span className="l">GANANCIA</span><span className="r">{L(o.total - inversion - (o.comision || 0))}</span></div>
               </div>
+
+              {/* Pay status */}
+              <div>
+                <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 8 }}>Estado de pago</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  {(o.pay === 'boxful'
+                    ? ['boxful-pending','boxful-paid']
+                    : [`${o.pay}`]
+                  ).map(s => (
+                    <button key={s} className={`badge ${s}`} onClick={() => onUpdatePay(s)}
+                      style={{ cursor: 'pointer', opacity: s === o.payStatus ? 1 : 0.3, padding: '5px 10px', transition: 'opacity 0.15s' }}>
+                      <span className="pip" />{PAY_STATUS_LABELS[s] || s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Financial */}
+              <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid var(--line)' }}>
+                <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 10 }}>Liquidación</div>
+                {[
+                  ['Venta', L(o.total), 'var(--text)'],
+                  ['Inversión', '−' + L(inversion), 'var(--warn)'],
+                  ['Comisión', o.comision ? '−' + L(o.comision) : '—', 'var(--warn)'],
+                ].map(([k, v, col]) => (
+                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
+                    <span className="mono" style={{ fontSize: 10, color: 'var(--muted)' }}>{k}</span>
+                    <span className="mono" style={{ fontSize: 12, color: col, fontWeight: 600 }}>{v}</span>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
+                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 14 }}>GANANCIA</span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 18, color: ganancia >= 0 ? 'var(--ok)' : 'var(--accent)' }}>{L(ganancia)}</span>
+                </div>
+              </div>
+
             </div>
           </div>
-        );
-      })()}
+        </div>
+
+        {/* Footer actions */}
+        <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', display: 'flex', gap: 10, background: '#0F0F0F', flexShrink: 0 }}>
+          <button className="btn sm ghost" onClick={printReceipt}><Icon name="dl" size={11} /> Imprimir recibo</button>
+          <button className="btn sm ghost" style={{ marginLeft: 'auto', color: 'var(--accent)', borderColor: '#3D1515' }}
+            onClick={() => { if (window.confirm(`¿Eliminar pedido #${o.n}?`)) onDelete(); }}>
+            × Eliminar pedido
+          </button>
+          <button className="btn sm" onClick={onClose}>Cerrar</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -4034,7 +4135,7 @@ function App() {
 
         <div className="content">
           {route === 'nueva'      && <NuevaVenta key={orderKey} onOrderCreated={(o) => handleOrderCreated(o)} onReset={() => { setOrderKey(k => k + 1); setRoute('nueva'); }} nextOrderNumber={nextOrderNumber} clients={clients} payConfig={payConfig} onClientCreated={(c) => setClients(prev => prev.find(x => x.phone === c.phone) ? prev : [c, ...prev])} prendas={prendas} designs={designs} dtfStock={dtfStock} />}
-          {route === 'ventas'     && <Ventas orders={orders} onOrderUpdate={handleOrderUpdate} onOrderDelete={handleDeleteOrder} payConfig={payConfig} />}
+          {route === 'ventas'     && <Ventas orders={orders} onOrderUpdate={handleOrderUpdate} onOrderDelete={handleDeleteOrder} payConfig={payConfig} designs={designs} prendas={prendas} />}
           {route === 'clientes'   && <Clientes clients={clients} setClients={setClients} orders={orders} />}
           {route === 'inventario' && <Inventario prendas={prendas} setPrendas={setPrendas} dtfSizes={dtfSizes} setDtfSizes={setDtfSizes} stock={stock} addStock={addStock} setStockVal={setStockVal} dtfStock={dtfStock} setDtfStock={setDtfStock} designs={designs} setDesigns={setDesigns} designCats={designCats} setDesignCats={setDesignCats} setOrders={setOrders} />}
           {route === 'metricas'   && <Metricas orders={orders} />}

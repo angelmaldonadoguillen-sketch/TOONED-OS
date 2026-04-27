@@ -1148,23 +1148,23 @@ const PAY_STATUS_LABELS = {
   'efectivo-pending':'Pendiente · Efectivo',
 };
 
-const SAMPLE_ORDERS = [
-  { n: 1049, cliente: 'Andrea Mejía',       ciudad: 'Tegucigalpa',  canal: 'Instagram', items: [{c:'negro', s:'L',  d:'GT-01', q:1}, {c:'negro', s:'M',  d:'SP-02', q:1}], pay: 'boxful', payStatus: 'boxful-pending', estado: 'enviado',    total: 890, comision: 35, fecha: '2026-04-16' },
-  { n: 1048, cliente: 'Carlos Zelaya',      ciudad: 'San Pedro Sula', canal: 'WhatsApp', items: [{c:'blanco',s:'XL', d:'AE-86',q:1}], pay: 'bac',    payStatus: 'bac',             estado: 'recibido',   total: 420, comision: 0, fecha: '2026-04-15' },
-  { n: 1047, cliente: 'María Fernanda P.',  ciudad: 'Tegucigalpa',  canal: 'TikTok',    items: [{c:'beige', s:'M',  d:'KM-03', q:1}, {c:'beige', s:'S', d:'ON-06', q:1}, {c:'negro',s:'L',d:'AK-04',q:1}], pay: 'boxful', payStatus: 'boxful-paid',     estado: 'recibido',   total: 1240, comision: 45, fecha: '2026-04-15' },
-  { n: 1046, cliente: 'Javier Bonilla',     ciudad: 'La Ceiba',     canal: 'Instagram', items: [{c:'negro', s:'L',  d:'RX-07', q:1}], pay: 'boxful', payStatus: 'boxful-paid',     estado: 'recibido',   total: 420, comision: 30, fecha: '2026-04-14' },
-  { n: 1045, cliente: 'Kimberly Ayala',     ciudad: 'Tegucigalpa',  canal: 'Tienda Online', items: [{c:'blanco',s:'M',d:'SV-05',q:1}], pay: 'atlantida', payStatus: 'atlantida-pending',    estado: 'preparado',  total: 420, comision: 0, fecha: '2026-04-14' },
-  { n: 1044, cliente: 'Luis Hernández',     ciudad: 'San Pedro Sula', canal: 'WhatsApp', items: [{c:'negro',s:'XL',d:'BR-09',q:2}], pay: 'boxful', payStatus: 'boxful-pending',   estado: 'impresas',   total: 920, comision: 35, fecha: '2026-04-13' },
-  { n: 1043, cliente: 'Daniela Flores',     ciudad: 'Comayagua',    canal: 'Instagram', items: [{c:'beige', s:'S',  d:'GT-01', q:1}, {c:'beige',s:'M',d:'EV-07',q:1}], pay: 'boxful', payStatus: 'boxful-paid',   estado: 'recibido',   total: 840, comision: 40, fecha: '2026-04-13' },
-  { n: 1042, cliente: 'Roberto Cálix',      ciudad: 'Tegucigalpa',  canal: 'TikTok',    items: [{c:'negro', s:'L',  d:'TY-08', q:1}], pay: 'efectivo', payStatus: 'efectivo',       estado: 'recibido',   total: 420, comision: 0, fecha: '2026-04-12' },
-  { n: 1041, cliente: 'Sofía Cárcamo',      ciudad: 'Choluteca',    canal: 'WhatsApp',  items: [{c:'blanco',s:'L',d:'ON-06',q:1}], pay: 'boxful', payStatus: 'boxful-paid',       estado: 'recibido',   total: 420, comision: 35, fecha: '2026-04-11' },
-  { n: 1040, cliente: 'Gabriela Matute',    ciudad: 'Tegucigalpa',  canal: 'Instagram', items: [{c:'negro', s:'M',  d:'AK-04', q:1}], pay: 'boxful', payStatus: 'boxful-pending',  estado: 'rebotado',   total: 450, comision: 0, fecha: '2026-04-11' },
-  { n: 1039, cliente: 'José David Romero',  ciudad: 'El Progreso',  canal: 'WhatsApp',  items: [{c:'negro', s:'XL', d:'NK-10', q:1}, {c:'negro',s:'L',d:'SP-02',q:1}], pay: 'bac', payStatus: 'bac',     estado: 'recibido',   total: 830, comision: 0, fecha: '2026-04-10' },
-  { n: 1038, cliente: 'Isabela Andino',     ciudad: 'Tegucigalpa',  canal: 'Tienda Online', items: [{c:'beige',s:'M',d:'KM-03',q:1}], pay: 'ficohsa', payStatus: 'ficohsa',        estado: 'recibido',   total: 415, comision: 0, fecha: '2026-04-09' },
-  { n: 1037, cliente: 'Óscar Palma',        ciudad: 'Siguatepeque', canal: 'Instagram', items: [{c:'negro', s:'L',  d:'AE-86', q:1}], pay: 'boxful', payStatus: 'boxful-paid',     estado: 'recibido',   total: 420, comision: 35, fecha: '2026-04-08' },
-  { n: 1036, cliente: 'Valeria Núñez',      ciudad: 'San Pedro Sula', canal: 'TikTok',   items: [{c:'blanco',s:'S',d:'BR-09',q:1}, {c:'blanco',s:'M',d:'AK-04',q:1}], pay: 'boxful', payStatus: 'boxful-paid', estado: 'recibido', total: 890, comision: 40, fecha: '2026-04-07' },
-  { n: 1035, cliente: 'Marvin Discua',      ciudad: 'Tegucigalpa',  canal: 'WhatsApp',  items: [{c:'negro', s:'XL', d:'GT-01', q:1}], pay: 'boxful', payStatus: 'boxful-paid',     estado: 'recibido',   total: 420, comision: 35, fecha: '2026-04-06' },
-];
+const SAMPLE_ORDERS = [];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ============ metric-ready data ============
 const WEEK_SALES = [
@@ -1330,10 +1330,12 @@ function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], pa
   const addItem = () => {
     if (!pendingPrenda || !pendingColor || !pendingSize || !pendingDesign) return;
     const p = PRENDAS.find(x => x.id === pendingPrenda);
-    const d = CATALOG.find(x => x.id === pendingDesign);
     const colorObj = p.colors.find(c => c.id === pendingColor);
     const shirtCost = colorObj?.cost ?? 215;
-    setItems(prev => [...prev, { id: crypto.randomUUID().slice(0, 6), p: pendingPrenda, c: pendingColor, s: pendingSize, d: pendingDesign, q: 1, shirtCost, dtfCost: d.cost }]);
+    const isNone = pendingDesign === '__none__';
+    const d = isNone ? null : CATALOG.find(x => x.id === pendingDesign);
+    const dtfCost = isNone ? 0 : (d?.cost || 0);
+    setItems(prev => [...prev, { id: crypto.randomUUID().slice(0, 6), p: pendingPrenda, c: pendingColor, s: pendingSize, d: pendingDesign, q: 1, shirtCost, dtfCost }]);
     setPendingDesign(null);
   };
 
@@ -1608,6 +1610,13 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
               <span className="dim">{CATALOG.length} DISEÑOS</span>
             </div>
             <div className="catalog-grid">
+              {/* Sin diseño */}
+              <div className={`catalog-card ${pendingDesign === '__none__' ? 'on' : ''}`} onClick={() => setPendingDesign('__none__')}
+                style={{ borderStyle: 'dashed', opacity: 0.85 }}>
+                <div className="thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: 'var(--dim)' }}>∅</div>
+                <div className="nm"><span>Sin diseño</span></div>
+                <div className="cat-cost"><span style={{ color: 'var(--dim)' }}>Solo prenda · Sin DTF</span></div>
+              </div>
               {CATALOG.map(d => {
                 const stock = DTF_STOCK.filter(s => s.design === d.id).reduce((a, s) => a + s.qty, 0);
                 return (
@@ -1645,15 +1654,17 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
           )}
           {items.map((i, idx) => {
             const c = SHIRT_COLORS.find(x => x.id === i.c);
-            const d = CATALOG.find(x => x.id === i.d);
+            const d = i.d === '__none__' ? { name: 'Sin diseño' } : CATALOG.find(x => x.id === i.d);
             const p = PRENDAS.find(x => x.id === i.p);
             return (
               <div key={i.id} className="line-item" style={{ gridTemplateColumns: '36px 1fr auto auto 28px', gap: 8 }}>
                 <div className="idx">#{(idx + 1).toString().padStart(2, '0')}</div>
                 <div className="info">
-                  <div className="pname">{d.name}</div>
-                  <div className="pdetails"><ColorDot id={i.c} /> {p?.name.toUpperCase() || 'CAMISETA'} · {c.name.toUpperCase()} · {i.s}</div>
-                  <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>PRENDA {L(i.shirtCost)} + DTF {L(i.dtfCost)}</div>
+                  <div className="pname">{d?.name || 'Sin diseño'}</div>
+                  <div className="pdetails"><ColorDot id={i.c} /> {p?.name.toUpperCase() || 'CAMISETA'} · {c?.name.toUpperCase()} · {i.s}</div>
+                  <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                    PRENDA {L(i.shirtCost)}{i.dtfCost > 0 ? ` + DTF ${L(i.dtfCost)}` : ' · SIN DTF'}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 0, border: '1px solid var(--line)', height: 28, alignSelf: 'center' }}>
                   <button onClick={() => updateItemQty(i.id, -1)} style={{ padding: '0 8px', color: 'var(--muted)', fontSize: 16, height: '100%', borderRight: '1px solid var(--line)' }}>−</button>
@@ -1815,17 +1826,17 @@ function Step4Resumen({ orderN, cliente, items, payment, totals, onConfirm, onRe
           <div style={{ padding: '4px 16px 16px' }}>
             {items.map((i, idx) => {
               const c = SHIRT_COLORS.find(x => x.id === i.c);
-              const d = CATALOG.find(x => x.id === i.d);
+              const d = i.d === '__none__' ? { name: 'Sin diseño', cost: 0 } : CATALOG.find(x => x.id === i.d);
               const p = PRENDAS.find(x => x.id === i.p);
               return (
                 <div key={i.id} className="line-item" style={{ marginTop: 8 }}>
                   <div className="idx">{(idx + 1).toString().padStart(2, '0')}</div>
                   <div className="info">
-                    <div className="pname">{d.name}</div>
-                    <div className="pdetails"><ColorDot id={i.c} /> {p?.name || 'Camiseta'} · {c.name} · {i.s} · {i.d}</div>
+                    <div className="pname">{d?.name || 'Sin diseño'}</div>
+                    <div className="pdetails"><ColorDot id={i.c} /> {p?.name || 'Camiseta'} · {c?.name} · {i.s} · {i.d !== '__none__' ? i.d : '—'}</div>
                   </div>
                   <div className="cost-breakdown">
-                    <div>PRENDA {L(i.shirtCost)} + DTF {L(i.dtfCost)}</div>
+                    <div>PRENDA {L(i.shirtCost)}{i.dtfCost > 0 ? ` + DTF ${L(i.dtfCost)}` : ' · SIN DTF'}</div>
                     <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>x{i.q}</span>
                   </div>
                   <div className="mono" style={{ fontSize: 10, color: 'var(--dim)', letterSpacing: '0.1em' }}>x{i.q}</div>
@@ -2091,7 +2102,7 @@ Object.assign(window, { Metricas });
 </script>
 <script type="text/babel">
 // Ventas table
-function Ventas({ orders, onOrderUpdate }) {
+function Ventas({ orders, onOrderUpdate, onOrderDelete }) {
   const [filters, setFilters] = useState({ estado: 'all', pay: 'all', canal: 'all', fecha: 'all', q: '' });
   const [selected, setSelected] = useState(null);
   const [payMenu, setPayMenu] = useState(null); // { orderN, x, y }
@@ -2218,14 +2229,15 @@ function Ventas({ orders, onOrderUpdate }) {
                 <th>Pago</th>
                 <th>Estado</th>
                 <th>Fecha</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(o => {
                 const inversion = o.items.reduce((a, i) => {
                   const c = SHIRT_COLORS.find(x => x.id === i.c);
-                  const d = CATALOG.find(x => x.id === i.d);
-                  return a + (c.cost + d.cost) * i.q;
+                  const d = i.d === '__none__' ? { cost: 0 } : CATALOG.find(x => x.id === i.d);
+                  return a + ((c?.cost || 0) + (d?.cost || 0)) * i.q;
                 }, 0);
                 const ganancia = o.total - inversion - (o.comision || 0);
                 const isSel = selected === o.n;
@@ -2262,6 +2274,15 @@ function Ventas({ orders, onOrderUpdate }) {
                       </span>
                     </td>
                     <td className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{o.fecha.slice(5)}</td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => onOrderDelete(o.n)}
+                        title="Eliminar pedido"
+                        style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, padding: '2px 8px', border: '1px solid #3D1515', background: 'rgba(0,0,0,0.5)', cursor: 'pointer', opacity: 0.7, lineHeight: 1 }}
+                        onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                        onMouseLeave={e => e.currentTarget.style.opacity = 0.7}
+                      >×</button>
+                    </td>
                   </tr>
                 );
               })}
@@ -2289,8 +2310,8 @@ function Ventas({ orders, onOrderUpdate }) {
         if (!o) return null;
         const inversion = o.items.reduce((a, i) => {
           const c = SHIRT_COLORS.find(x => x.id === i.c);
-          const d = CATALOG.find(x => x.id === i.d);
-          return a + (c.cost + d.cost) * i.q;
+          const d = i.d === '__none__' ? { cost: 0 } : CATALOG.find(x => x.id === i.d);
+          return a + ((c?.cost || 0) + (d?.cost || 0)) * i.q;
         }, 0);
         return (
           <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -2318,7 +2339,7 @@ function Ventas({ orders, onOrderUpdate }) {
                     <div class="row"><span class="label">Estado</span><span>${STATUS_LABELS[o.estado] || o.estado}</span></div>
                     <hr/>
                     <div style="font-size:11px;color:#666;font-weight:700;margin-bottom:8px">PIEZAS</div>
-                    ${o.items.map(i => { const col=SHIRT_COLORS.find(x=>x.id===i.c); const des=CATALOG.find(x=>x.id===i.d); return `<div class="item">${des?.name||i.d} · ${col?.name||i.c} · T${i.s} × ${i.q}</div>`; }).join('')}
+                    ${o.items.map(i => { const col=SHIRT_COLORS.find(x=>x.id===i.c); const des=i.d==='__none__'?{name:'Sin diseño'}:CATALOG.find(x=>x.id===i.d); return `<div class="item">${des?.name||'Sin diseño'} · ${col?.name||i.c} · T${i.s} × ${i.q}</div>`; }).join('')}
                     <hr/>
                     <div class="row"><span class="label">Subtotal</span><span>L ${o.total.toLocaleString()}</span></div>
                     <div class="row"><span class="label">Inversión</span><span>L ${inversion.toLocaleString()}</span></div>
@@ -2343,14 +2364,14 @@ function Ventas({ orders, onOrderUpdate }) {
                 <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.12em', marginBottom: 8 }}>PIEZAS</div>
                 {o.items.map((i, idx) => {
                   const c = SHIRT_COLORS.find(x => x.id === i.c);
-                  const d = CATALOG.find(x => x.id === i.d);
+                  const d = i.d === '__none__' ? { name: 'Sin diseño', cost: 0 } : CATALOG.find(x => x.id === i.d);
                   return (
                     <div key={idx} style={{ padding: '10px 0', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13 }}>{d.name}</div>
-                        <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.06em', marginTop: 2 }}><ColorDot id={i.c} /> {c.name.toUpperCase()} · TALLA {i.s} · x{i.q}</div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13 }}>{d?.name || 'Sin diseño'}</div>
+                        <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.06em', marginTop: 2 }}><ColorDot id={i.c} /> {c?.name.toUpperCase()} · TALLA {i.s} · x{i.q}</div>
                       </div>
-                      <div className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>CAM {L(c.cost)} + DTF {L(d.cost)}</div>
+                      <div className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>CAM {L(c?.cost || 0)}{d?.cost > 0 ? ` + DTF ${L(d.cost)}` : ''}</div>
                     </div>
                   );
                 })}
@@ -2454,49 +2475,11 @@ function seedStock() {
   return s;
 }
 
-function Inventario({ designCats, setDesignCats }) {
+function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStock, setStockVal, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders }) {
   const [tab, setTab] = useState('prendas');
-  const [prendas, setPrendas] = useState(PRENDAS);
-  const [dtfSizes, setDtfSizes] = useState(DTF_SIZES);
-  const [stock, setStock] = useState(seedStock);
-  const [dtfStock, setDtfStock] = useState(DTF_STOCK);
-  const [designs, setDesigns] = useState(CATALOG);
-  const [fbLoaded, setFbLoaded] = useState(false);
-  const invTimer = useRef(null);
-
-  // Cargar inventario desde Firebase al montar
-  useEffect(() => {
-    window.db.collection('data').doc('inventory').get().then(doc => {
-      if (doc.exists) {
-        const d = doc.data();
-        if (d.prendas?.length)  setPrendas(d.prendas);
-        if (d.stock)            setStock(d.stock);
-        if (d.designs?.length)  setDesigns(d.designs);
-        if (d.dtfSizes?.length) setDtfSizes(d.dtfSizes);
-        if (d.dtfStock?.length) setDtfStock(d.dtfStock);
-      }
-    }).catch(e => console.warn('Inv load:', e)).finally(() => setFbLoaded(true));
-  }, []);
-
-  // Guardar inventario cuando cambia (debounced 2s)
-  useEffect(() => {
-    if (!fbLoaded) return;
-    clearTimeout(invTimer.current);
-    invTimer.current = setTimeout(() => {
-      window.db.collection('data').doc('inventory').set({ prendas, stock, designs, dtfSizes, dtfStock })
-        .catch(e => console.warn('Inv save:', e));
-    }, 2000);
-  }, [prendas, stock, designs, dtfSizes, dtfStock, fbLoaded]);
 
   const totalPrendas = Object.values(stock).reduce((a, v) => a + v, 0);
   const totalDTF = dtfStock.reduce((a, d) => a + d.qty, 0);
-
-  const addStock = (key, delta) => {
-    setStock(prev => ({ ...prev, [key]: Math.max(0, (prev[key] || 0) + delta) }));
-  };
-  const setStockVal = (key, val) => {
-    setStock(prev => ({ ...prev, [key]: Math.max(0, val) }));
-  };
 
   return (
     <div>
@@ -2560,7 +2543,7 @@ function Inventario({ designCats, setDesignCats }) {
       })()}
 
       {tab === 'prendas' && <PrendasStockTab prendas={prendas} setPrendas={setPrendas} stock={stock} addStock={addStock} setStockVal={setStockVal} />}
-      {tab === 'disenos' && <DisenosTab dtfSizes={dtfSizes} setDtfSizes={setDtfSizes} dtfStock={dtfStock} setDtfStock={setDtfStock} designs={designs} setDesigns={setDesigns} designCats={designCats} setDesignCats={setDesignCats} />}
+      {tab === 'disenos' && <DisenosTab dtfSizes={dtfSizes} setDtfSizes={setDtfSizes} dtfStock={dtfStock} setDtfStock={setDtfStock} designs={designs} setDesigns={setDesigns} designCats={designCats} setDesignCats={setDesignCats} setOrders={setOrders} />}
     </div>
   );
 }
@@ -2583,6 +2566,38 @@ const BASE_COLORS = [
 function PrendasStockTab({ prendas, setPrendas, stock, addStock, setStockVal }) {
   const lowThreshold = 3;
   const [editing, setEditing] = useState(null);
+  const [editName, setEditName] = useState({});
+  const [showNewCat, setShowNewCat] = useState(false);
+  const [newCatId, setNewCatId] = useState('');
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatSizes, setNewCatSizes] = useState(['S','M','L','XL']);
+
+  const startEditName = (p) => {
+    setEditing(p.id);
+    setEditName(prev => ({ ...prev, [p.id]: p.name }));
+  };
+
+  const renamePrenda = (id) => {
+    const newName = (editName[id] || '').trim();
+    if (!newName) return;
+    setPrendas(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p));
+  };
+
+  const deletePrenda = (id) => {
+    if (!window.confirm('¿Eliminar esta categoría? Se borrará su stock también.')) return;
+    setPrendas(prev => prev.filter(p => p.id !== id));
+  };
+
+  const TALLAS_BASE = ['XS','S','M','L','XL','XXL','ÚNICA'];
+  const toggleSize = (sz) => setNewCatSizes(prev => prev.includes(sz) ? prev.filter(s => s !== sz) : [...prev, sz]);
+
+  const saveNewCat = () => {
+    const id = newCatId.trim().toUpperCase();
+    const name = newCatName.trim();
+    if (!id || !name || prendas.find(p => p.id === id)) return;
+    setPrendas(prev => [...prev, { id, name, tipo: 'camiseta', icon: '👕', sizes: newCatSizes.length ? newCatSizes : ['S','M','L','XL'], colors: [] }]);
+    setNewCatId(''); setNewCatName(''); setNewCatSizes(['S','M','L','XL']); setShowNewCat(false);
+  };
 
   const removeColorEntry = (prendaId, uid) => {
     setPrendas(prev => prev.map(p => p.id === prendaId
@@ -2607,6 +2622,54 @@ function PrendasStockTab({ prendas, setPrendas, stock, addStock, setStockVal }) 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+
+      {/* Nueva categoría */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: -8 }}>
+        <button className="btn primary" style={{ padding: '12px 18px', fontSize: 12 }} onClick={() => setShowNewCat(s => !s)}>
+          <Icon name="plus" size={13} /> Nueva categoría
+        </button>
+      </div>
+
+      {showNewCat && (
+        <div style={{ background: 'var(--card)', border: '1px solid var(--accent)', padding: 24 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16, marginBottom: 20 }}>Nueva categoría de prenda</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 16, marginBottom: 20 }}>
+            <div className="field">
+              <label>Código</label>
+              <input className="input mono" placeholder="CMO" maxLength={6}
+                value={newCatId} onChange={e => setNewCatId(e.target.value.toUpperCase())} />
+            </div>
+            <div className="field">
+              <label>Nombre de la categoría</label>
+              <input className="input" placeholder="Camiseta Oversize"
+                value={newCatName} onChange={e => setNewCatName(e.target.value)} />
+            </div>
+          </div>
+          <div className="field" style={{ marginBottom: 20 }}>
+            <label>Tallas disponibles</label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+              {TALLAS_BASE.map(sz => (
+                <button key={sz} type="button"
+                  onClick={() => toggleSize(sz)}
+                  style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 12, padding: '6px 14px',
+                    background: newCatSizes.includes(sz) ? 'var(--accent)' : '#0B0B0B',
+                    color: newCatSizes.includes(sz) ? '#0A0A0A' : 'var(--muted)',
+                    border: `1px solid ${newCatSizes.includes(sz) ? 'var(--accent)' : 'var(--line)'}`,
+                    cursor: 'pointer' }}>
+                  {sz}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button className="btn ghost" onClick={() => setShowNewCat(false)}>Cancelar</button>
+            <button className="btn primary" disabled={!newCatId.trim() || !newCatName.trim()} onClick={saveNewCat}>
+              <Icon name="check" size={12} /> Crear categoría
+            </button>
+          </div>
+        </div>
+      )}
+
       {prendas.map(p => {
         const totalForProduct = p.colors.reduce((a, c) => {
           const uid = c.uid || c.id;
@@ -2624,14 +2687,37 @@ function PrendasStockTab({ prendas, setPrendas, stock, addStock, setStockVal }) 
             {/* Product header */}
             <div style={{ padding: '24px 28px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 20, background: '#0F0F0F' }}>
               <div style={{ flex: 1 }}>
-                <div className="mono" style={{ fontSize: 10, color: 'var(--accent)', letterSpacing: '0.18em', marginBottom: 4 }}>{p.id}</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 28, letterSpacing: '-0.02em', lineHeight: 1 }}>{p.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                  <div className="mono" style={{ fontSize: 10, color: 'var(--accent)', letterSpacing: '0.18em' }}>{p.id}</div>
+                  {isEditing && (
+                    <button onClick={() => deletePrenda(p.id)}
+                      style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--accent)', border: '1px solid #3D1515', background: 'rgba(0,0,0,0.6)', padding: '1px 8px', cursor: 'pointer', letterSpacing: '0.06em' }}>
+                      × Eliminar categoría
+                    </button>
+                  )}
+                </div>
+                {isEditing ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input
+                      className="input"
+                      style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 22, letterSpacing: '-0.02em', height: 40, padding: '0 12px', flex: 1, maxWidth: 360 }}
+                      value={editName[p.id] ?? p.name}
+                      onChange={e => setEditName(prev => ({ ...prev, [p.id]: e.target.value }))}
+                      onKeyDown={e => e.key === 'Enter' && renamePrenda(p.id)}
+                    />
+                    <button className="btn sm primary" onClick={() => renamePrenda(p.id)}>
+                      <Icon name="check" size={11} /> Renombrar
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 28, letterSpacing: '-0.02em', lineHeight: 1 }}>{p.name}</div>
+                )}
                 <div className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', marginTop: 6, textTransform: 'uppercase' }}>
                   {p.colors.length} entradas · {p.sizes.length} tallas
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <button className={isEditing ? 'btn primary sm' : 'btn sm'} onClick={() => setEditing(isEditing ? null : p.id)}>
+                <button className={isEditing ? 'btn primary sm' : 'btn sm'} onClick={() => isEditing ? setEditing(null) : startEditName(p)}>
                   {isEditing ? <><Icon name="check" size={11} /> Listo</> : <><Icon name="edit" size={11} /> Editar</>}
                 </button>
                 <div style={{ textAlign: 'right' }}>
@@ -2928,11 +3014,12 @@ function StockStepper({ value, low, onAdd, onSub, onChange }) {
 // ============================================================
 // DISEÑOS TAB — redesigned
 // ============================================================
-function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats }) {
+function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders }) {
   const [showNew, setShowNew] = useState(false);
   const [manageSizes, setManageSizes] = useState(false);
   const [newSize, setNewSize] = useState('');
   const [editingDesign, setEditingDesign] = useState(null);
+  const [editMeta, setEditMeta] = useState({});
 
   const getQty = (designId, size) => dtfStock.find(s => s.design === designId && s.size === size)?.qty || 0;
 
@@ -2963,6 +3050,26 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
     setDtfStock(prev => prev.filter(s => s.design !== id));
   };
 
+  const startEditing = (d) => {
+    setEditingDesign(d.id);
+    setEditMeta(prev => ({ ...prev, [d.id]: { id: d.id, name: d.name } }));
+  };
+
+  const renameDesign = (oldId) => {
+    const meta = editMeta[oldId] || {};
+    const newId = (meta.id || '').trim().toUpperCase();
+    const newName = (meta.name || '').trim();
+    if (!newId || !newName) return;
+    setDesigns(prev => prev.map(d => d.id === oldId ? { ...d, id: newId, name: newName } : d));
+    setDtfStock(prev => prev.map(s => s.design === oldId ? { ...s, design: newId } : s));
+    if (setOrders) setOrders(prev => prev.map(o => ({
+      ...o,
+      items: o.items?.map(i => i.d === oldId ? { ...i, d: newId } : i)
+    })));
+    setEditingDesign(null);
+    setEditMeta(prev => { const n = { ...prev }; delete n[oldId]; return n; });
+  };
+
   const addSize = () => {
     const v = newSize.trim().toUpperCase();
     if (!v || dtfSizes.includes(v)) return;
@@ -2983,8 +3090,8 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
     ));
   };
 
-  const saveNewDesign = ({ sku, name, cost, tag, thumb }) => {
-    setDesigns(prev => prev.find(x => x.id === sku) ? prev : [...prev, { id: sku, name, cost, tag, thumb: thumb || null }]);
+  const saveNewDesign = ({ sku, name, tag, thumb }) => {
+    setDesigns(prev => prev.find(x => x.id === sku) ? prev : [...prev, { id: sku, name, tag, thumb: thumb || null }]);
     setShowNew(false);
   };
 
@@ -3072,12 +3179,31 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
                   <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.14em', textTransform: 'uppercase', flex: 1 }}>Stock por tamaño</div>
                   <button
-                    onClick={() => setEditingDesign(isEditing ? null : d.id)}
+                    onClick={() => isEditing ? setEditingDesign(null) : startEditing(d)}
                     className="btn sm ghost"
                     style={{ fontSize: 9, padding: '2px 8px', color: isEditing ? 'var(--ok)' : 'var(--muted)' }}>
-                    {isEditing ? '✓ Listo' : '✎ Editar precios'}
+                    {isEditing ? '✓ Cerrar' : '✎ Editar'}
                   </button>
                 </div>
+                {isEditing && (
+                  <div style={{ marginBottom: 14, padding: '12px 14px', background: '#0B0B0B', border: '1px solid var(--line)', display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+                    <div style={{ flex: '0 0 90px' }}>
+                      <div className="mono" style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.1em', marginBottom: 4 }}>SKU</div>
+                      <input className="input mono" style={{ fontSize: 12, height: 30, padding: '0 8px' }}
+                        value={editMeta[d.id]?.id ?? d.id}
+                        onChange={e => setEditMeta(prev => ({ ...prev, [d.id]: { ...(prev[d.id] || { id: d.id, name: d.name }), id: e.target.value.toUpperCase() } }))} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div className="mono" style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.1em', marginBottom: 4 }}>NOMBRE</div>
+                      <input className="input" style={{ fontSize: 12, height: 30, padding: '0 8px' }}
+                        value={editMeta[d.id]?.name ?? d.name}
+                        onChange={e => setEditMeta(prev => ({ ...prev, [d.id]: { ...(prev[d.id] || { id: d.id, name: d.name }), name: e.target.value } }))} />
+                    </div>
+                    <button className="btn sm primary" style={{ height: 30, fontSize: 10, whiteSpace: 'nowrap' }} onClick={() => renameDesign(d.id)}>
+                      Guardar
+                    </button>
+                  </div>
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {dtfSizes.map(sz => {
                     const qty = getQty(d.id, sz);
@@ -3162,7 +3288,6 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
 function NewDisenoForm({ onSave, onCancel, designCats = ['JDM','ANIME','STREET','OTRO'], setDesignCats }) {
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
-  const [cost, setCost] = useState(85);
   const [tag, setTag] = useState(designCats[0] || 'JDM');
   const [catManage, setCatManage] = useState(false);
   const [newCat, setNewCat] = useState('');
@@ -3201,10 +3326,6 @@ function NewDisenoForm({ onSave, onCancel, designCats = ['JDM','ANIME','STREET',
         <div className="field" style={{ gridColumn: 'span 2' }}>
           <label>Nombre del diseño <span className="req">*</span></label>
           <input className="input" placeholder="EVO X TARMAC WHITE" value={name} onChange={e => setName(e.target.value)} />
-        </div>
-        <div className="field">
-          <label>Costo DTF (L)</label>
-          <input type="number" className="input mono" value={cost} onChange={e => setCost(Number(e.target.value))} />
         </div>
         <div className="field" style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--line)', paddingTop: 16 }}>
           <label>Miniatura del diseño</label>
@@ -3257,7 +3378,7 @@ function NewDisenoForm({ onSave, onCancel, designCats = ['JDM','ANIME','STREET',
       </div>
       <div style={{ padding: '16px 24px', borderTop: '1px solid var(--line)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
         <button className="btn ghost" onClick={onCancel}>Cancelar</button>
-        <button className="btn primary" disabled={!canSave} onClick={() => onSave({ sku, name, cost, tag, thumb })}>
+        <button className="btn primary" disabled={!canSave} onClick={() => onSave({ sku, name, tag, thumb })}>
           <Icon name="check" size={12} /> Guardar diseño
         </button>
       </div>
@@ -3595,6 +3716,18 @@ function App() {
   const [fbReady, setFbReady] = useS(false);
   const saveTimers = React.useRef({});
 
+  // ── Inventario state (lifted so Ventas can restore stock on delete) ──
+  const [prendas, setPrendas] = useS(PRENDAS);
+  const [dtfSizes, setDtfSizes] = useS(DTF_SIZES);
+  const [stock, setStock] = useS(seedStock);
+  const [dtfStock, setDtfStock] = useS(DTF_STOCK);
+  const [designs, setDesigns] = useS(CATALOG);
+  const [invReady, setInvReady] = useS(false);
+  const invTimer = React.useRef(null);
+
+  const addStock = (key, delta) => setStock(prev => ({ ...prev, [key]: Math.max(0, (prev[key] || 0) + delta) }));
+  const setStockVal = (key, val) => setStock(prev => ({ ...prev, [key]: Math.max(0, val) }));
+
   // ── Firebase: cargar datos al iniciar ──
   useE(() => {
     const col = window.db.collection('data');
@@ -3602,14 +3735,23 @@ function App() {
       col.doc('orders').get(),
       col.doc('clients').get(),
       col.doc('config').get(),
-    ]).then(([oDoc, cDoc, cfDoc]) => {
+      col.doc('inventory').get(),
+    ]).then(([oDoc, cDoc, cfDoc, invDoc]) => {
       if (oDoc.exists && oDoc.data().items?.length) setOrders(oDoc.data().items);
       if (cDoc.exists && cDoc.data().items?.length) setClients(cDoc.data().items);
       if (cfDoc.exists && cfDoc.data().payConfig?.length) {
         setPayConfig(cfDoc.data().payConfig);
         if (cfDoc.data().designCats?.length) setDesignCats(cfDoc.data().designCats);
       }
-    }).catch(e => console.warn('Firebase load:', e)).finally(() => setFbReady(true));
+      if (invDoc.exists) {
+        const d = invDoc.data();
+        if (d.prendas?.length)  setPrendas(d.prendas);
+        if (d.stock)            setStock(d.stock);
+        if (d.designs?.length)  setDesigns(d.designs);
+        if (d.dtfSizes?.length) setDtfSizes(d.dtfSizes);
+        if (d.dtfStock?.length) setDtfStock(d.dtfStock);
+      }
+    }).catch(e => console.warn('Firebase load:', e)).finally(() => { setFbReady(true); setInvReady(true); });
   }, []);
 
   // ── Firebase: guardar con debounce al cambiar datos ──
@@ -3622,6 +3764,14 @@ function App() {
   useE(() => { if (fbReady) fbSave('orders',  { items: orders }); },    [orders,  fbReady]);
   useE(() => { if (fbReady) fbSave('clients', { items: clients }); },   [clients, fbReady]);
   useE(() => { if (fbReady) fbSave('config',  { payConfig, designCats }); }, [payConfig, designCats, fbReady]);
+  useE(() => {
+    if (!invReady) return;
+    clearTimeout(invTimer.current);
+    invTimer.current = setTimeout(() => {
+      window.db.collection('data').doc('inventory').set({ prendas, stock, designs, dtfSizes, dtfStock })
+        .catch(e => console.warn('Inv save:', e));
+    }, 2000);
+  }, [prendas, stock, designs, dtfSizes, dtfStock, invReady]);
 
   useE(() => { localStorage.setItem('tooned-route', route); }, [route]);
 
@@ -3676,6 +3826,30 @@ function App() {
 
   const handleOrderUpdate = (n, patch) => {
     setOrders(prev => prev.map(o => o.n === n ? { ...o, ...patch } : o));
+  };
+
+  const handleDeleteOrder = (n) => {
+    const order = orders.find(o => o.n === n);
+    if (!order) return;
+    if (!window.confirm(`¿Eliminar pedido #${n} de ${order.cliente}?\nEl stock de los items regresará al inventario.`)) return;
+    // Restore shirt stock
+    order.items?.forEach(i => {
+      if (i.p && i.c && i.s) {
+        const key = makeStockKey(i.p, i.c, i.s);
+        setStock(prev => ({ ...prev, [key]: (prev[key] || 0) + (i.q || 1) }));
+      }
+    });
+    // Restore DTF stock
+    order.items?.forEach(i => {
+      if (i.d && i.d !== '__none__' && i.s) {
+        setDtfStock(prev => {
+          const existing = prev.find(s => s.design === i.d && s.size === i.s);
+          if (existing) return prev.map(s => s.design === i.d && s.size === i.s ? { ...s, qty: s.qty + (i.q || 1) } : s);
+          return [...prev, { design: i.d, size: i.s, qty: i.q || 1 }];
+        });
+      }
+    });
+    setOrders(prev => prev.filter(o => o.n !== n));
   };
 
   const modules = [
@@ -3826,9 +4000,9 @@ function App() {
 
         <div className="content">
           {route === 'nueva'      && <NuevaVenta key={orderKey} onOrderCreated={(o) => handleOrderCreated(o)} onReset={() => { setOrderKey(k => k + 1); setRoute('nueva'); }} nextOrderNumber={nextOrderNumber} clients={clients} payConfig={payConfig} onClientCreated={(c) => setClients(prev => prev.find(x => x.phone === c.phone) ? prev : [c, ...prev])} />}
-          {route === 'ventas'     && <Ventas orders={orders} onOrderUpdate={handleOrderUpdate} payConfig={payConfig} />}
+          {route === 'ventas'     && <Ventas orders={orders} onOrderUpdate={handleOrderUpdate} onOrderDelete={handleDeleteOrder} payConfig={payConfig} />}
           {route === 'clientes'   && <Clientes clients={clients} setClients={setClients} orders={orders} />}
-          {route === 'inventario' && <Inventario designCats={designCats} setDesignCats={setDesignCats} />}
+          {route === 'inventario' && <Inventario prendas={prendas} setPrendas={setPrendas} dtfSizes={dtfSizes} setDtfSizes={setDtfSizes} stock={stock} addStock={addStock} setStockVal={setStockVal} dtfStock={dtfStock} setDtfStock={setDtfStock} designs={designs} setDesigns={setDesigns} designCats={designCats} setDesignCats={setDesignCats} setOrders={setOrders} />}
           {route === 'metricas'   && <Metricas orders={orders} />}
           {route === 'config'     && <Configuracion payConfig={payConfig} setPayConfig={setPayConfig} />}
         </div>

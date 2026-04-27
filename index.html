@@ -1339,7 +1339,14 @@ function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], pa
     const isNone = pendingDesign === '__none__';
     const d = isNone ? null : designs.find(x => x.id === pendingDesign);
     const dtfCost = isNone ? 0 : getDesignCost(d);
-    setItems(prev => [...prev, { id: crypto.randomUUID().slice(0, 6), p: pendingPrenda, c: pendingColor, s: pendingSize, d: pendingDesign, q: 1, shirtCost, dtfCost }]);
+    // Auto-pick DTF size: first size with stock > 0, otherwise first size in the list
+    const dtfSize = isNone ? null : (() => {
+      const withStock = dtfStock.filter(s => s.design === pendingDesign && s.qty > 0);
+      if (withStock.length) return withStock[0].size;
+      const anyEntry = dtfStock.find(s => s.design === pendingDesign);
+      return anyEntry?.size || null;
+    })();
+    setItems(prev => [...prev, { id: crypto.randomUUID().slice(0, 6), p: pendingPrenda, c: pendingColor, s: pendingSize, d: pendingDesign, dtf: dtfSize, q: 1, shirtCost, dtfCost }]);
     setPendingDesign(null);
   };
 
@@ -1403,7 +1410,7 @@ function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], pa
             const payStatus = pm && pm.envio > 0 ? `${payment}-pending` : payment;
             onOrderCreated({
               n: nextOrderNumber, cliente: cliente.nombre, phone: cliente.contacto, ciudad: cliente.ciudad, canal: cliente.canal, direccion: cliente.direccion || '',
-              items: items.map(i => ({ c: i.c, s: i.s, d: i.d, q: i.q })),
+              items: items.map(i => ({ p: i.p, c: i.c, s: i.s, d: i.d, dtf: i.dtf, q: i.q, shirtCost: i.shirtCost, dtfCost: i.dtfCost })),
               pay: payment, total: totals.precio,
               estado: 'sin-empezar', payStatus,
               comision: totals.comisionEst, fecha: new Date().toISOString().slice(0,10),
@@ -3981,6 +3988,23 @@ function App() {
 
   const handleOrderCreated = (order) => {
     setOrders(prev => [order, ...prev]);
+    // Deduct shirt stock
+    order.items?.forEach(i => {
+      if (i.p && i.c && i.s) {
+        const key = makeStockKey(i.p, i.c, i.s);
+        setStock(prev => ({ ...prev, [key]: Math.max(0, (prev[key] || 0) - (i.q || 1)) }));
+      }
+    });
+    // Deduct DTF stock (uses i.dtf = auto-assigned DTF size at order time)
+    order.items?.forEach(i => {
+      if (i.d && i.d !== '__none__' && i.dtf) {
+        setDtfStock(prev => prev.map(s =>
+          s.design === i.d && s.size === i.dtf
+            ? { ...s, qty: Math.max(0, s.qty - (i.q || 1)) }
+            : s
+        ));
+      }
+    });
     // Auto-save/update client by phone
     if (order.phone) {
       setClients(prev => {
@@ -4016,13 +4040,13 @@ function App() {
         setStock(prev => ({ ...prev, [key]: (prev[key] || 0) + (i.q || 1) }));
       }
     });
-    // Restore DTF stock
+    // Restore DTF stock (uses i.dtf = the DTF size that was deducted at order time)
     order.items?.forEach(i => {
-      if (i.d && i.d !== '__none__' && i.s) {
+      if (i.d && i.d !== '__none__' && i.dtf) {
         setDtfStock(prev => {
-          const existing = prev.find(s => s.design === i.d && s.size === i.s);
-          if (existing) return prev.map(s => s.design === i.d && s.size === i.s ? { ...s, qty: s.qty + (i.q || 1) } : s);
-          return [...prev, { design: i.d, size: i.s, qty: i.q || 1 }];
+          const existing = prev.find(s => s.design === i.d && s.size === i.dtf);
+          if (existing) return prev.map(s => s.design === i.d && s.size === i.dtf ? { ...s, qty: s.qty + (i.q || 1) } : s);
+          return [...prev, { design: i.d, size: i.dtf, qty: i.q || 1 }];
         });
       }
     });

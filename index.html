@@ -3993,12 +3993,8 @@ function LoginScreen({ onAuth }) {
 // Main App shell
 const { useState: useS, useEffect: useE } = React;
 
-function App() {
-  const [authed, setAuthed] = useS(() => sessionStorage.getItem('tooned-auth') === '1');
-
-  if (!authed) return <LoginScreen onAuth={() => setAuthed(true)} />;
-
-  const logout = () => { sessionStorage.removeItem('tooned-auth'); setAuthed(false); };
+function App({ onLogout }) {
+  const logout = () => { sessionStorage.removeItem('tooned-auth'); onLogout(); };
 
   const [route, setRoute] = useS(() => localStorage.getItem('tooned-route') || 'nueva');
   const [orderKey, setOrderKey] = useS(0);
@@ -4425,8 +4421,14 @@ function App() {
   );
 }
 
+function Root() {
+  const [authed, setAuthed] = React.useState(() => sessionStorage.getItem('tooned-auth') === '1');
+  if (!authed) return <LoginScreen onAuth={() => setAuthed(true)} />;
+  return <App onLogout={() => setAuthed(false)} />;
+}
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
+root.render(<Root />);
 
 </script>
 </body>

@@ -757,7 +757,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
   font-family: var(--font-display); font-weight: 900; font-size: 22px;
   color: var(--accent); letter-spacing: -0.03em;
 }
-.top-row .th { width: 36px; height: 36px; background: #0B0B0B; border: 1px solid var(--line); }
+.top-row .th { width: 36px; height: 36px; background: #0B0B0B; border: 1px solid var(--line); overflow: hidden; flex-shrink: 0; }
 .top-row .nm { font-family: var(--font-display); font-weight: 600; font-size: 13px; }
 .top-row .snm { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
 .top-row .v { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
@@ -1950,7 +1950,7 @@ Object.assign(window, { NuevaVenta });
 // Métricas dashboard — datos en tiempo real desde orders
 const MES_LABELS = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
 
-function Metricas({ orders = [] }) {
+function Metricas({ orders = [], designs = [] }) {
   const [period, setPeriod] = useState('mes');
   const now = new Date();
   const cy = now.getFullYear(), cm = now.getMonth();
@@ -1995,14 +1995,17 @@ function Metricas({ orders = [] }) {
   const topDesigns = useMemo(() => {
     const map = {};
     filteredOrders.forEach(o => o.items.forEach(i => {
-      if (!map[i.d]) { const d=CATALOG.find(x=>x.id===i.d); map[i.d]={id:i.d,name:d?.name||i.d,qty:0,revenue:0}; }
-      const col=SHIRT_COLORS.find(x=>x.id===i.c), des=CATALOG.find(x=>x.id===i.d);
+      if (!map[i.d]) {
+        const d = designs.find(x=>x.id===i.d) || CATALOG.find(x=>x.id===i.d);
+        map[i.d] = { id: i.d, name: d?.name||i.d, thumb: d?.thumb||null, qty: 0, revenue: 0 };
+      }
+      const col=SHIRT_COLORS.find(x=>x.id===i.c), des=designs.find(x=>x.id===i.d)||CATALOG.find(x=>x.id===i.d);
       const price=Math.max(420, Math.ceil(((col?.cost||215)+(des?.cost||85))*1.35/5)*5);
       map[i.d].qty += i.q;
       map[i.d].revenue += price*i.q;
     }));
     return Object.values(map).sort((a,b)=>b.revenue-a.revenue).slice(0,5);
-  }, [filteredOrders]);
+  }, [filteredOrders, designs]);
 
   const channelBreakdown = useMemo(() => {
     const map = {};
@@ -2107,7 +2110,11 @@ function Metricas({ orders = [] }) {
                 {topDesigns.map((d,i) => (
                   <div key={d.id} className="top-row">
                     <div className="rank">{(i+1).toString().padStart(2,'0')}</div>
-                    <div className="th"><CatThumb id={d.id} /></div>
+                    <div className="th">
+                      {d.thumb
+                        ? <img src={d.thumb} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+                        : <CatThumb id={d.id} />}
+                    </div>
                     <div><div className="nm">{d.name}</div><div className="snm">{d.id} · {d.qty} UDS</div></div>
                     <div className="v">{L(d.revenue)}</div>
                   </div>
@@ -4401,7 +4408,7 @@ function App({ onLogout }) {
               designCats={designCats} setDesignCats={setDesignCats}
               setOrders={setOrders}
             />}
-          {route === 'metricas'   && <Metricas orders={orders} />}
+          {route === 'metricas'   && <Metricas orders={orders} designs={designs} />}
           {route === 'config'     && <Configuracion payConfig={payConfig} setPayConfig={setPayConfig} />}
         </div>
       </div>

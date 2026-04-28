@@ -2658,7 +2658,7 @@ function seedStock() {
   return s;
 }
 
-function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStock, setStockVal, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders }) {
+function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStock, setStockVal, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow }) {
   const [tab, setTab] = useState('prendas');
 
   const totalPrendas = Object.values(stock).reduce((a, v) => a + v, 0);
@@ -2726,7 +2726,7 @@ function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStoc
       })()}
 
       {tab === 'prendas' && <PrendasStockTab prendas={prendas} setPrendas={setPrendas} stock={stock} addStock={addStock} setStockVal={setStockVal} />}
-      {tab === 'disenos' && <DisenosTab dtfSizes={dtfSizes} setDtfSizes={setDtfSizes} dtfStock={dtfStock} setDtfStock={setDtfStock} designs={designs} setDesigns={setDesigns} designCats={designCats} setDesignCats={setDesignCats} setOrders={setOrders} />}
+      {tab === 'disenos' && <DisenosTab dtfSizes={dtfSizes} setDtfSizes={setDtfSizes} dtfStock={dtfStock} setDtfStock={setDtfStock} designs={designs} setDesigns={setDesigns} designCats={designCats} setDesignCats={setDesignCats} setOrders={setOrders} saveInvNow={saveInvNow} />}
     </div>
   );
 }
@@ -3197,7 +3197,7 @@ function StockStepper({ value, low, onAdd, onSub, onChange }) {
 // ============================================================
 // DISEÑOS TAB — redesigned
 // ============================================================
-function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders }) {
+function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow }) {
   const [showNew, setShowNew] = useState(false);
   const [manageSizes, setManageSizes] = useState(false);
   const [newSize, setNewSize] = useState('');
@@ -3232,6 +3232,8 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
   const deleteDesign = (id) => {
     setDesigns(prev => prev.filter(d => d.id !== id));
     setDtfStock(prev => prev.filter(s => s.design !== id));
+    // Force immediate save after state commits — never lose a delete to debounce
+    if (saveInvNow) setTimeout(() => saveInvNow(), 0);
   };
 
   const startEditing = (d) => {
@@ -3257,6 +3259,7 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
     })));
     setEditingDesign(null);
     setEditMeta(prev => { const n = { ...prev }; delete n[oldId]; return n; });
+    if (saveInvNow) setTimeout(() => saveInvNow(), 0);
   };
 
   const addSize = () => {
@@ -3287,6 +3290,7 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
     if (dupName) { alert(`Ya existe un diseño con el nombre "${dupName.name}".`); return; }
     setDesigns(prev => [...prev, { id: sku, name, tag, thumb: thumb || null }]);
     setShowNew(false);
+    if (saveInvNow) setTimeout(() => saveInvNow(), 0);
   };
 
   const totalUds = dtfStock.reduce((a, s) => a + s.qty, 0);
@@ -4058,14 +4062,68 @@ function App({ onLogout }) {
   const invReadyRef = React.useRef(false);
 
   // Explicit save — only called from real user actions, never from Firebase load
+  // Short debounce (400ms) so a refresh/close doesn't lose changes; flushed on unload too
+  const flushInvSave = React.useRef(() => {});
+  flushInvSave.current = () => {
+    if (!invReadyRef.current) return;
+    if (!invTimer.current) return;
+    clearTimeout(invTimer.current);
+    invTimer.current = null;
+    try {
+      window.db.collection('data').doc('inventory').set(invSnap.current)
+        .catch(e => console.warn('Inv flush:', e));
+    } catch (e) { console.warn('Inv flush err:', e); }
+  };
   const scheduleInvSave = () => {
     if (!invReadyRef.current) return;
     clearTimeout(invTimer.current);
     invTimer.current = setTimeout(() => {
+      invTimer.current = null;
       window.db.collection('data').doc('inventory').set(invSnap.current)
         .catch(e => console.warn('Inv save:', e));
-    }, 2000);
+    }, 400);
   };
+  // Save IMMEDIATELY for design catalog ops — never lose a design due to debounce
+  const saveInvNow = () => {
+    if (!invReadyRef.current) return;
+    clearTimeout(invTimer.current);
+    invTimer.current = null;
+    window.db.collection('data').doc('inventory').set(invSnap.current)
+      .catch(e => console.warn('Inv save now:', e));
+  };
+
+  // Flush pending saves when the tab is closed/hidden — prevents data loss on quick exit
+  // Refetch inventory when tab becomes visible — multi-tab safety
+  const refetchInv = React.useRef(() => {});
+  refetchInv.current = () => {
+    if (!invReadyRef.current) return;
+    if (invTimer.current) return; // a write is pending; don't clobber local edits
+    window.db.collection('data').doc('inventory').get().then(invDoc => {
+      if (!invDoc.exists) return;
+      const d = invDoc.data();
+      if (d.prendas?.length)  setPrendas(d.prendas);
+      if (d.stock)            setStock(d.stock);
+      if (d.designs?.length)  setDesigns(d.designs);
+      if (d.dtfSizes?.length) setDtfSizes(d.dtfSizes);
+      if (d.dtfStock?.length) setDtfStock(d.dtfStock);
+    }).catch(e => console.warn('Inv resync:', e));
+  };
+
+  React.useEffect(() => {
+    const onUnload = () => { flushInvSave.current(); };
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') flushInvSave.current();
+      else if (document.visibilityState === 'visible') refetchInv.current();
+    };
+    window.addEventListener('beforeunload', onUnload);
+    window.addEventListener('pagehide', onUnload);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.removeEventListener('beforeunload', onUnload);
+      window.removeEventListener('pagehide', onUnload);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, []);
 
   const addStock   = (key, delta) => { setStock(prev => ({ ...prev, [key]: Math.max(0, (prev[key] || 0) + delta) })); scheduleInvSave(); };
   const setStockVal = (key, val)  => { setStock(prev => ({ ...prev, [key]: Math.max(0, val) })); scheduleInvSave(); };
@@ -4407,6 +4465,7 @@ function App({ onLogout }) {
               designs={designs}   setDesigns={(v)   => { setDesigns(v);   scheduleInvSave(); }}
               designCats={designCats} setDesignCats={setDesignCats}
               setOrders={setOrders}
+              saveInvNow={saveInvNow}
             />}
           {route === 'metricas'   && <Metricas orders={orders} designs={designs} />}
           {route === 'config'     && <Configuracion payConfig={payConfig} setPayConfig={setPayConfig} />}

@@ -1303,7 +1303,7 @@ Object.assign(window, { Icon, StatusBadge, PayBadge, ColorDot, fmtItems, sumOrde
 </script>
 <script type="text/babel">
 // Nueva Venta — multi-step flow
-function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], payConfig = PAY_CONFIG_DEFAULT, onClientCreated, prendas = PRENDAS, designs = CATALOG, dtfStock = DTF_STOCK }) {
+function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], payConfig = PAY_CONFIG_DEFAULT, onClientCreated, prendas = PRENDAS, designs = CATALOG, dtfStock = DTF_STOCK, stock = {} }) {
   const [step, setStep] = useState(1);
   const [cliente, setCliente] = useState({ nombre: '', contacto: '', ciudad: '', canal: 'Instagram', direccion: '' });
 
@@ -4088,6 +4088,15 @@ function App({ onLogout }) {
   const [fbReady, setFbReady] = useS(false);
   const saveTimers = React.useRef({});
 
+  // ── Toast / snackbar system ──
+  const [toast, setToast] = useS(null); // { msg, tone: 'ok'|'warn'|'info' }
+  const toastTimer = React.useRef(null);
+  const showToast = (msg, tone = 'ok') => {
+    setToast({ msg, tone });
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
+  };
+
   // ── Inventario state (lifted so Ventas can restore stock on delete) ──
   const [prendas, setPrendas] = useS(PRENDAS);
   const [dtfSizes, setDtfSizes] = useS(DTF_SIZES);
@@ -4142,9 +4151,26 @@ function App({ onLogout }) {
       .catch(e => console.warn('Inv save now:', e));
   };
   // Explicit user-driven commit/cancel for the Inventario page
+  const [invSaving, setInvSaving] = useS(false);
   const commitInv = () => {
-    saveInvNow();
-    setInvDirty(false);
+    if (!invReadyRef.current) {
+      showToast('Firebase aún no está listo, esperá un segundo', 'warn');
+      return;
+    }
+    setInvSaving(true);
+    clearTimeout(invTimer.current);
+    invTimer.current = null;
+    window.db.collection('data').doc('inventory').set(invSnap.current)
+      .then(() => {
+        setInvDirty(false);
+        setInvSaving(false);
+        showToast('✓ Inventario guardado', 'ok');
+      })
+      .catch(e => {
+        setInvSaving(false);
+        console.warn('Inv commit:', e);
+        showToast('No se pudo guardar — revisá tu conexión', 'warn');
+      });
   };
   const cancelInv = () => {
     if (!invReadyRef.current) return;
@@ -4158,6 +4184,7 @@ function App({ onLogout }) {
       if (d.designs?.length)  setDesigns(d.designs);
       if (d.dtfSizes?.length) setDtfSizes(d.dtfSizes);
       if (d.dtfStock?.length) setDtfStock(d.dtfStock);
+      showToast('Cambios descartados', 'info');
     }).catch(e => console.warn('Inv cancel:', e));
   };
 
@@ -4307,6 +4334,7 @@ function App({ onLogout }) {
       }
     });
     scheduleInvSave();
+    showToast(`✓ Pedido #${order.n} creado · stock actualizado`, 'ok');
     // Auto-save/update client by phone
     if (order.phone) {
       setClients(prev => {
@@ -4348,6 +4376,7 @@ function App({ onLogout }) {
         }
       });
       scheduleInvSave();
+      showToast(`Pedido #${n} marcado como rebotado · stock restaurado`, 'info');
     }
     setOrders(prev => prev.map(o => o.n === n ? { ...o, ...patch } : o));
   };
@@ -4375,6 +4404,7 @@ function App({ onLogout }) {
     });
     scheduleInvSave();
     setOrders(prev => prev.filter(o => o.n !== n));
+    showToast(`Pedido #${n} eliminado · stock restaurado`, 'info');
   };
 
   const modules = [
@@ -4525,7 +4555,7 @@ function App({ onLogout }) {
         </div>
 
         <div className="content">
-          {route === 'nueva'      && <NuevaVenta key={orderKey} onOrderCreated={(o) => handleOrderCreated(o)} onReset={() => { setOrderKey(k => k + 1); setRoute('nueva'); }} nextOrderNumber={nextOrderNumber} clients={clients} payConfig={payConfig} onClientCreated={(c) => setClients(prev => prev.find(x => x.phone === c.phone) ? prev : [c, ...prev])} prendas={prendas} designs={designs} dtfStock={dtfStock} />}
+          {route === 'nueva'      && <NuevaVenta key={orderKey} onOrderCreated={(o) => handleOrderCreated(o)} onReset={() => { setOrderKey(k => k + 1); setRoute('nueva'); }} nextOrderNumber={nextOrderNumber} clients={clients} payConfig={payConfig} onClientCreated={(c) => setClients(prev => prev.find(x => x.phone === c.phone) ? prev : [c, ...prev])} prendas={prendas} designs={designs} dtfStock={dtfStock} stock={stock} />}
           {route === 'ventas'     && <Ventas orders={orders} onOrderUpdate={handleOrderUpdate} onOrderDelete={handleDeleteOrder} payConfig={payConfig} designs={designs} prendas={prendas} />}
           {route === 'clientes'   && <Clientes clients={clients} setClients={setClients} orders={orders} />}
           {route === 'inventario' && <Inventario
@@ -4537,12 +4567,35 @@ function App({ onLogout }) {
               designCats={designCats} setDesignCats={setDesignCats}
               setOrders={setOrders}
               saveInvNow={saveInvNow}
-              invDirty={invDirty} commitInv={commitInv} cancelInv={cancelInv}
+              invDirty={invDirty} commitInv={commitInv} cancelInv={cancelInv} invSaving={invSaving}
             />}
           {route === 'metricas'   && <Metricas orders={orders} designs={designs} />}
           {route === 'config'     && <Configuracion payConfig={payConfig} setPayConfig={setPayConfig} />}
         </div>
       </div>
+
+      {/* Toast / snackbar */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+          padding: '14px 20px',
+          background: toast.tone === 'warn' ? '#1A0A0A' : toast.tone === 'info' ? '#0A1018' : '#0A1A0E',
+          border: `1px solid ${toast.tone === 'warn' ? 'var(--accent)' : toast.tone === 'info' ? 'var(--info)' : 'var(--ok)'}`,
+          color: 'var(--text)',
+          fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.04em', fontWeight: 500,
+          minWidth: 240, maxWidth: 380,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          animation: 'toastIn 0.25s ease-out'
+        }}>
+          {toast.msg}
+        </div>
+      )}
+      <style>{`
+        @keyframes toastIn {
+          from { transform: translateY(12px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `}</style>
 
       {tweaksOpen && (
         <div className="tweaks-panel">

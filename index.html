@@ -554,19 +554,22 @@ input, select, textarea { font-family: inherit; color: inherit; }
   font-family: var(--font-mono); font-size: 11px; color: var(--muted);
 }
 
-.size-row { display: flex; gap: 8px; }
+.size-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .size-btn {
-  width: 60px; height: 56px;
+  width: 60px; height: 60px;
   border: 1px solid var(--line-2);
   background: var(--surface);
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 20px;
+  font-size: 18px;
   color: var(--text);
   transition: all 0.1s;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  padding: 4px 0;
 }
 .size-btn:hover { border-color: var(--text); }
 .size-btn.on { background: var(--accent); border-color: var(--accent); color: #0A0A0A; }
+.size-btn.on .mono { color: #0A0A0A !important; }
 
 .catalog-grid {
   display: grid;
@@ -1303,7 +1306,7 @@ Object.assign(window, { Icon, StatusBadge, PayBadge, ColorDot, fmtItems, sumOrde
 </script>
 <script type="text/babel">
 // Nueva Venta — multi-step flow
-function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], payConfig = PAY_CONFIG_DEFAULT, onClientCreated, prendas = PRENDAS, designs = CATALOG, dtfStock = DTF_STOCK }) {
+function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], payConfig = PAY_CONFIG_DEFAULT, onClientCreated, prendas = PRENDAS, designs = CATALOG, dtfStock = DTF_STOCK, stock = {} }) {
   const [step, setStep] = useState(1);
   const [cliente, setCliente] = useState({ nombre: '', contacto: '', ciudad: '', canal: 'Instagram', direccion: '' });
 
@@ -1395,7 +1398,7 @@ function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], pa
           pendingSize={pendingSize} setPendingSize={setPendingSize}
           pendingDesign={pendingDesign} setPendingDesign={setPendingDesign}
           addItem={addItem} items={items} removeItem={removeItem} updateItemQty={updateItemQty}
-          prendas={prendas} designs={designs} dtfStock={dtfStock}
+          prendas={prendas} designs={designs} dtfStock={dtfStock} stock={stock}
         />
       )}
       {step === 3 && (
@@ -1562,11 +1565,28 @@ const getDesignCost = (d) => {
   return 0;
 };
 
-function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPendingColor, pendingSize, setPendingSize, pendingDesign, setPendingDesign, addItem, items, removeItem, updateItemQty, prendas = PRENDAS, designs = CATALOG, dtfStock = DTF_STOCK }) {
+function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPendingColor, pendingSize, setPendingSize, pendingDesign, setPendingDesign, addItem, items, removeItem, updateItemQty, prendas = PRENDAS, designs = CATALOG, dtfStock = DTF_STOCK, stock = {} }) {
   const prendaObj = prendas.find(p => p.id === pendingPrenda);
   const availableColors = prendaObj ? prendaObj.colors : [];
   const availableSizes = prendaObj ? prendaObj.sizes : [];
   const [designSearch, setDesignSearch] = useState('');
+
+  // ── Stock helpers ──
+  // Items already in cart consume stock too; subtract them so the user sees true availability
+  const stockKey = (p, c, s) => `${p}-${c}-${s}`; // mirrors makeStockKey from inventory module
+  const reservedFor = (prendaId, colorUid, size) =>
+    items.filter(i => i.p === prendaId && i.c === colorUid && i.s === size).reduce((a, i) => a + (i.q || 0), 0);
+  const stockAt = (prendaId, colorUid, size) => {
+    const raw = stock[stockKey(prendaId, colorUid, size)] || 0;
+    return Math.max(0, raw - reservedFor(prendaId, colorUid, size));
+  };
+  const totalStockForColor = (prendaId, colorUid) =>
+    (prendaObj?.sizes || []).reduce((a, sz) => a + stockAt(prendaId, colorUid, sz), 0);
+  // Resolve current pending shirt stock — drives "Agregar pieza" availability
+  const currentShirtStock = (pendingPrenda && pendingColor && pendingSize)
+    ? stockAt(pendingPrenda, pendingColor, pendingSize)
+    : null;
+  const shirtAgotado = currentShirtStock === 0;
 
   const filteredDesigns = designSearch.trim()
     ? designs.filter(d => {
@@ -1613,13 +1633,25 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
               B · Color{prendaObj && <span style={{color:'var(--dim)', marginLeft:8}}>({availableColors.length} disp.)</span>}
             </div>
             <div className="color-swatch-row">
-              {availableColors.map(c => (
-                <div key={c.uid || c.id} className={`color-swatch ${pendingColor === (c.uid || c.id) ? 'on' : ''}`} onClick={() => setPendingColor(c.uid || c.id)}>
-                  <div className="chip-c" style={{ background: c.hex, borderColor: c.border }} />
-                  <div className="name">{c.name.toUpperCase()}</div>
-                  <div className="cost">{L(c.cost)} · COSTO</div>
-                </div>
-              ))}
+              {availableColors.map(c => {
+                const uid = c.uid || c.id;
+                const totStk = totalStockForColor(pendingPrenda, uid);
+                const colorAgotado = totStk === 0;
+                return (
+                  <div key={uid} className={`color-swatch ${pendingColor === uid ? 'on' : ''}`}
+                    onClick={() => setPendingColor(uid)}
+                    style={{ position: 'relative', opacity: colorAgotado ? 0.6 : 1 }}>
+                    <div className="chip-c" style={{ background: c.hex, borderColor: c.border }} />
+                    <div className="name">{c.name.toUpperCase()}</div>
+                    <div className="cost" style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
+                      <span>{L(c.cost)}</span>
+                      <span style={{ color: colorAgotado ? 'var(--accent)' : totStk <= 3 ? 'var(--warn)' : 'var(--ok)' }}>
+                        {colorAgotado ? '● AGOTADO' : `● ${totStk} stk`}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -1628,9 +1660,33 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
               C · Talla
             </div>
             <div className="size-row">
-              {availableSizes.map(s => (
-                <button key={s} className={`size-btn ${pendingSize === s ? 'on' : ''}`} onClick={() => setPendingSize(s)} style={{ width: s === 'ÚNICA' ? 90 : 60 }}>{s}</button>
-              ))}
+              {availableSizes.map(s => {
+                const stk = pendingPrenda && pendingColor ? stockAt(pendingPrenda, pendingColor, s) : 0;
+                const sizeAgotado = stk === 0;
+                const isOn = pendingSize === s;
+                return (
+                  <button key={s}
+                    className={`size-btn ${isOn ? 'on' : ''}`}
+                    onClick={() => setPendingSize(s)}
+                    style={{
+                      width: s === 'ÚNICA' ? 90 : 60,
+                      position: 'relative',
+                      opacity: sizeAgotado ? 0.5 : 1,
+                      borderColor: isOn ? 'var(--accent)' : sizeAgotado ? 'var(--line)' : 'var(--line-2)',
+                    }}>
+                    <div>{s}</div>
+                    <div className="mono" style={{
+                      fontSize: 9,
+                      fontWeight: 500,
+                      color: sizeAgotado ? 'var(--accent)' : stk <= 3 ? 'var(--warn)' : 'var(--ok)',
+                      letterSpacing: '0.04em',
+                      marginTop: 2,
+                    }}>
+                      {sizeAgotado ? '∅ 0' : `${stk} ud`}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -1696,9 +1752,38 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
             </div>{/* fin scroll wrapper */}
           </div>
 
-          <button className="btn primary" disabled={!pendingPrenda || !pendingColor || !pendingSize || !pendingDesign} onClick={addItem} style={{ alignSelf: 'flex-start', padding: '12px 18px' }}>
-            <Icon name="plus" size={13} /> Agregar pieza al pedido
-          </button>
+          {/* Stock warning + add button */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignSelf: 'flex-start' }}>
+            {pendingPrenda && pendingColor && pendingSize && shirtAgotado && (
+              <div style={{
+                padding: '8px 12px',
+                background: '#1A0A0A',
+                border: '1px solid var(--accent)',
+                fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em',
+                color: 'var(--accent)',
+              }}>
+                ⚠ NO HAY STOCK DE ESTA COMBINACIÓN — agregá inventario antes de vender
+              </div>
+            )}
+            {pendingPrenda && pendingColor && pendingSize && !shirtAgotado && currentShirtStock !== null && currentShirtStock <= 3 && (
+              <div style={{
+                padding: '8px 12px',
+                background: '#1A1200',
+                border: '1px solid var(--warn)',
+                fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em',
+                color: 'var(--warn)',
+              }}>
+                ⚠ STOCK BAJO · solo {currentShirtStock} disponibles
+              </div>
+            )}
+            <button className="btn primary"
+              disabled={!pendingPrenda || !pendingColor || !pendingSize || !pendingDesign || shirtAgotado}
+              onClick={addItem}
+              style={{ padding: '12px 18px' }}
+              title={shirtAgotado ? 'Sin stock para esta combinación' : ''}>
+              <Icon name="plus" size={13} /> {shirtAgotado ? 'Sin stock disponible' : 'Agregar pieza al pedido'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2658,7 +2743,7 @@ function seedStock() {
   return s;
 }
 
-function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStock, setStockVal, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow, invDirty, commitInv, cancelInv }) {
+function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStock, setStockVal, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow, invDirty, commitInv, cancelInv, invSaving }) {
   const [tab, setTab] = useState('prendas');
   const [confirmCancel, setConfirmCancel] = useState(false);
 
@@ -2685,24 +2770,24 @@ function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStoc
           <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
             {confirmCancel ? (
               <>
-                <button onClick={() => setConfirmCancel(false)}
-                  style={{ padding:'8px 14px', border:'1px solid var(--line-2)', color:'var(--muted)', fontFamily:'var(--font-mono)', fontSize:11, letterSpacing:'0.1em' }}>
+                <button onClick={() => setConfirmCancel(false)} disabled={invSaving}
+                  style={{ padding:'8px 14px', border:'1px solid var(--line-2)', color:'var(--muted)', fontFamily:'var(--font-mono)', fontSize:11, letterSpacing:'0.1em', opacity: invSaving ? 0.5 : 1 }}>
                   ATRÁS
                 </button>
-                <button onClick={() => { cancelInv(); setConfirmCancel(false); }}
-                  style={{ padding:'8px 14px', border:'1px solid var(--accent)', background:'var(--accent)', color:'#fff', fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700, letterSpacing:'0.1em' }}>
+                <button onClick={() => { cancelInv(); setConfirmCancel(false); }} disabled={invSaving}
+                  style={{ padding:'8px 14px', border:'1px solid var(--accent)', background:'var(--accent)', color:'#fff', fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700, letterSpacing:'0.1em', opacity: invSaving ? 0.5 : 1 }}>
                   SÍ, DESCARTAR
                 </button>
               </>
             ) : (
               <>
-                <button onClick={() => setConfirmCancel(true)}
-                  style={{ padding:'8px 14px', border:'1px solid var(--line-2)', color:'var(--muted)', fontFamily:'var(--font-mono)', fontSize:11, letterSpacing:'0.1em' }}>
+                <button onClick={() => setConfirmCancel(true)} disabled={invSaving}
+                  style={{ padding:'8px 14px', border:'1px solid var(--line-2)', color:'var(--muted)', fontFamily:'var(--font-mono)', fontSize:11, letterSpacing:'0.1em', opacity: invSaving ? 0.5 : 1 }}>
                   DESCARTAR
                 </button>
-                <button onClick={commitInv}
-                  style={{ padding:'8px 16px', border:'1px solid var(--ok)', background:'var(--ok)', color:'#0A0A0A', fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700, letterSpacing:'0.1em' }}>
-                  ✓ GUARDAR CAMBIOS
+                <button onClick={commitInv} disabled={invSaving}
+                  style={{ padding:'8px 16px', border:'1px solid var(--ok)', background: invSaving ? '#3A5A3A' : 'var(--ok)', color:'#0A0A0A', fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700, letterSpacing:'0.1em', cursor: invSaving ? 'wait' : 'pointer' }}>
+                  {invSaving ? '⏱ GUARDANDO…' : '✓ GUARDAR CAMBIOS'}
                 </button>
               </>
             )}
@@ -4088,6 +4173,15 @@ function App({ onLogout }) {
   const [fbReady, setFbReady] = useS(false);
   const saveTimers = React.useRef({});
 
+  // ── Toast / snackbar system ──
+  const [toast, setToast] = useS(null); // { msg, tone: 'ok'|'warn'|'info' }
+  const toastTimer = React.useRef(null);
+  const showToast = (msg, tone = 'ok') => {
+    setToast({ msg, tone });
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
+  };
+
   // ── Inventario state (lifted so Ventas can restore stock on delete) ──
   const [prendas, setPrendas] = useS(PRENDAS);
   const [dtfSizes, setDtfSizes] = useS(DTF_SIZES);
@@ -4142,9 +4236,26 @@ function App({ onLogout }) {
       .catch(e => console.warn('Inv save now:', e));
   };
   // Explicit user-driven commit/cancel for the Inventario page
+  const [invSaving, setInvSaving] = useS(false);
   const commitInv = () => {
-    saveInvNow();
-    setInvDirty(false);
+    if (!invReadyRef.current) {
+      showToast('Firebase aún no está listo, esperá un segundo', 'warn');
+      return;
+    }
+    setInvSaving(true);
+    clearTimeout(invTimer.current);
+    invTimer.current = null;
+    window.db.collection('data').doc('inventory').set(invSnap.current)
+      .then(() => {
+        setInvDirty(false);
+        setInvSaving(false);
+        showToast('✓ Inventario guardado', 'ok');
+      })
+      .catch(e => {
+        setInvSaving(false);
+        console.warn('Inv commit:', e);
+        showToast('No se pudo guardar — revisá tu conexión', 'warn');
+      });
   };
   const cancelInv = () => {
     if (!invReadyRef.current) return;
@@ -4158,6 +4269,7 @@ function App({ onLogout }) {
       if (d.designs?.length)  setDesigns(d.designs);
       if (d.dtfSizes?.length) setDtfSizes(d.dtfSizes);
       if (d.dtfStock?.length) setDtfStock(d.dtfStock);
+      showToast('Cambios descartados', 'info');
     }).catch(e => console.warn('Inv cancel:', e));
   };
 
@@ -4307,6 +4419,7 @@ function App({ onLogout }) {
       }
     });
     scheduleInvSave();
+    showToast(`✓ Pedido #${order.n} creado · stock actualizado`, 'ok');
     // Auto-save/update client by phone
     if (order.phone) {
       setClients(prev => {
@@ -4348,6 +4461,7 @@ function App({ onLogout }) {
         }
       });
       scheduleInvSave();
+      showToast(`Pedido #${n} marcado como rebotado · stock restaurado`, 'info');
     }
     setOrders(prev => prev.map(o => o.n === n ? { ...o, ...patch } : o));
   };
@@ -4375,6 +4489,7 @@ function App({ onLogout }) {
     });
     scheduleInvSave();
     setOrders(prev => prev.filter(o => o.n !== n));
+    showToast(`Pedido #${n} eliminado · stock restaurado`, 'info');
   };
 
   const modules = [
@@ -4525,7 +4640,7 @@ function App({ onLogout }) {
         </div>
 
         <div className="content">
-          {route === 'nueva'      && <NuevaVenta key={orderKey} onOrderCreated={(o) => handleOrderCreated(o)} onReset={() => { setOrderKey(k => k + 1); setRoute('nueva'); }} nextOrderNumber={nextOrderNumber} clients={clients} payConfig={payConfig} onClientCreated={(c) => setClients(prev => prev.find(x => x.phone === c.phone) ? prev : [c, ...prev])} prendas={prendas} designs={designs} dtfStock={dtfStock} />}
+          {route === 'nueva'      && <NuevaVenta key={orderKey} onOrderCreated={(o) => handleOrderCreated(o)} onReset={() => { setOrderKey(k => k + 1); setRoute('nueva'); }} nextOrderNumber={nextOrderNumber} clients={clients} payConfig={payConfig} onClientCreated={(c) => setClients(prev => prev.find(x => x.phone === c.phone) ? prev : [c, ...prev])} prendas={prendas} designs={designs} dtfStock={dtfStock} stock={stock} />}
           {route === 'ventas'     && <Ventas orders={orders} onOrderUpdate={handleOrderUpdate} onOrderDelete={handleDeleteOrder} payConfig={payConfig} designs={designs} prendas={prendas} />}
           {route === 'clientes'   && <Clientes clients={clients} setClients={setClients} orders={orders} />}
           {route === 'inventario' && <Inventario
@@ -4537,12 +4652,35 @@ function App({ onLogout }) {
               designCats={designCats} setDesignCats={setDesignCats}
               setOrders={setOrders}
               saveInvNow={saveInvNow}
-              invDirty={invDirty} commitInv={commitInv} cancelInv={cancelInv}
+              invDirty={invDirty} commitInv={commitInv} cancelInv={cancelInv} invSaving={invSaving}
             />}
           {route === 'metricas'   && <Metricas orders={orders} designs={designs} />}
           {route === 'config'     && <Configuracion payConfig={payConfig} setPayConfig={setPayConfig} />}
         </div>
       </div>
+
+      {/* Toast / snackbar */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+          padding: '14px 20px',
+          background: toast.tone === 'warn' ? '#1A0A0A' : toast.tone === 'info' ? '#0A1018' : '#0A1A0E',
+          border: `1px solid ${toast.tone === 'warn' ? 'var(--accent)' : toast.tone === 'info' ? 'var(--info)' : 'var(--ok)'}`,
+          color: 'var(--text)',
+          fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.04em', fontWeight: 500,
+          minWidth: 240, maxWidth: 380,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          animation: 'toastIn 0.25s ease-out'
+        }}>
+          {toast.msg}
+        </div>
+      )}
+      <style>{`
+        @keyframes toastIn {
+          from { transform: translateY(12px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `}</style>
 
       {tweaksOpen && (
         <div className="tweaks-panel">

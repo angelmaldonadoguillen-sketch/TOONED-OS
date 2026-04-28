@@ -2658,20 +2658,63 @@ function seedStock() {
   return s;
 }
 
-function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStock, setStockVal, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow }) {
+function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStock, setStockVal, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow, invDirty, commitInv, cancelInv }) {
   const [tab, setTab] = useState('prendas');
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const totalPrendas = Object.values(stock).reduce((a, v) => a + v, 0);
   const totalDTF = dtfStock.reduce((a, d) => a + d.qty, 0);
 
   return (
     <div>
+      {invDirty && (
+        <div style={{
+          position:'sticky', top:0, zIndex:50,
+          margin:'-2px -2px 16px',
+          padding:'12px 18px',
+          background:'#1A1200',
+          border:'1px solid var(--warn)',
+          display:'flex', alignItems:'center', gap:14
+        }}>
+          <span style={{ color:'var(--warn)', fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700, letterSpacing:'0.14em' }}>
+            ⚠ CAMBIOS SIN GUARDAR
+          </span>
+          <span style={{ color:'var(--muted)', fontFamily:'var(--font-mono)', fontSize:10, letterSpacing:'0.06em' }}>
+            tus ediciones están solo en este dispositivo hasta que las guardes
+          </span>
+          <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
+            {confirmCancel ? (
+              <>
+                <button onClick={() => setConfirmCancel(false)}
+                  style={{ padding:'8px 14px', border:'1px solid var(--line-2)', color:'var(--muted)', fontFamily:'var(--font-mono)', fontSize:11, letterSpacing:'0.1em' }}>
+                  ATRÁS
+                </button>
+                <button onClick={() => { cancelInv(); setConfirmCancel(false); }}
+                  style={{ padding:'8px 14px', border:'1px solid var(--accent)', background:'var(--accent)', color:'#fff', fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700, letterSpacing:'0.1em' }}>
+                  SÍ, DESCARTAR
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => setConfirmCancel(true)}
+                  style={{ padding:'8px 14px', border:'1px solid var(--line-2)', color:'var(--muted)', fontFamily:'var(--font-mono)', fontSize:11, letterSpacing:'0.1em' }}>
+                  DESCARTAR
+                </button>
+                <button onClick={commitInv}
+                  style={{ padding:'8px 16px', border:'1px solid var(--ok)', background:'var(--ok)', color:'#0A0A0A', fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700, letterSpacing:'0.1em' }}>
+                  ✓ GUARDAR CAMBIOS
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       <div className="page-head">
         <div>
           <div className="page-kicker">MÓDULO · 04 / INVENTARIO</div>
           <div className="page-title">Inventario</div>
           <div className="page-desc">
-            Ingresá stock directamente en cada celda — usá los botones <strong style={{color:'var(--text)'}}>+ / −</strong> o escribí la cantidad. Los cambios se guardan en tiempo real.
+            Ingresá stock directamente en cada celda — usá los botones <strong style={{color:'var(--text)'}}>+ / −</strong> o escribí la cantidad. Tus cambios quedan en local hasta que pulses <strong style={{color:'var(--ok)'}}>GUARDAR CAMBIOS</strong>.
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -3232,8 +3275,7 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
   const deleteDesign = (id) => {
     setDesigns(prev => prev.filter(d => d.id !== id));
     setDtfStock(prev => prev.filter(s => s.design !== id));
-    // Force immediate save after state commits — never lose a delete to debounce
-    if (saveInvNow) setTimeout(() => saveInvNow(), 0);
+    // Marks invDirty automatically via setDesigns wrapper — user must click GUARDAR
   };
 
   const startEditing = (d) => {
@@ -3259,7 +3301,6 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
     })));
     setEditingDesign(null);
     setEditMeta(prev => { const n = { ...prev }; delete n[oldId]; return n; });
-    if (saveInvNow) setTimeout(() => saveInvNow(), 0);
   };
 
   const addSize = () => {
@@ -3290,7 +3331,6 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
     if (dupName) { alert(`Ya existe un diseño con el nombre "${dupName.name}".`); return; }
     setDesigns(prev => [...prev, { id: sku, name, tag, thumb: thumb || null }]);
     setShowNew(false);
-    if (saveInvNow) setTimeout(() => saveInvNow(), 0);
   };
 
   const totalUds = dtfStock.reduce((a, s) => a + s.qty, 0);
@@ -4054,6 +4094,11 @@ function App({ onLogout }) {
   const [stock, setStock] = useS(seedStock);
   const [dtfStock, setDtfStock] = useS(DTF_STOCK);
   const [designs, setDesigns] = useS(CATALOG);
+  // Tracks whether the user has unsaved manual edits in the Inventario page
+  const [invDirty, setInvDirty] = useS(false);
+  const invDirtyRef = React.useRef(false);
+  invDirtyRef.current = invDirty;
+  const markInvDirty = () => { if (!invDirtyRef.current) setInvDirty(true); };
   const invTimer = React.useRef(null);
   // Ref always holds the latest inventory snapshot — safe to read inside async callbacks
   const invSnap = React.useRef({ prendas, stock, designs, dtfSizes, dtfStock });
@@ -4061,12 +4106,17 @@ function App({ onLogout }) {
   // Set to true synchronously once Firebase has loaded (never reset)
   const invReadyRef = React.useRef(false);
 
-  // Explicit save — only called from real user actions, never from Firebase load
-  // Short debounce (400ms) so a refresh/close doesn't lose changes; flushed on unload too
+  // ─── Save strategy ─────────────────────────────────────────────
+  // - Manual inventory edits are NOT auto-saved. They mark invDirty.
+  // - User clicks "GUARDAR" to commit (commitInv) or "DESCARTAR" to revert (cancelInv).
+  // - Sale-driven changes (handleOrderCreated etc) call scheduleInvSave directly.
+  // - On tab close / refresh / hide, any dirty state or pending timer is flushed.
+  // ───────────────────────────────────────────────────────────────
   const flushInvSave = React.useRef(() => {});
   flushInvSave.current = () => {
     if (!invReadyRef.current) return;
-    if (!invTimer.current) return;
+    const hasDirty = invDirtyRef.current || !!invTimer.current;
+    if (!hasDirty) return;
     clearTimeout(invTimer.current);
     invTimer.current = null;
     try {
@@ -4083,13 +4133,32 @@ function App({ onLogout }) {
         .catch(e => console.warn('Inv save:', e));
     }, 400);
   };
-  // Save IMMEDIATELY for design catalog ops — never lose a design due to debounce
+  // Save IMMEDIATELY (used for sales-flow operations and explicit commit)
   const saveInvNow = () => {
     if (!invReadyRef.current) return;
     clearTimeout(invTimer.current);
     invTimer.current = null;
-    window.db.collection('data').doc('inventory').set(invSnap.current)
+    return window.db.collection('data').doc('inventory').set(invSnap.current)
       .catch(e => console.warn('Inv save now:', e));
+  };
+  // Explicit user-driven commit/cancel for the Inventario page
+  const commitInv = () => {
+    saveInvNow();
+    setInvDirty(false);
+  };
+  const cancelInv = () => {
+    if (!invReadyRef.current) return;
+    if (invTimer.current) { clearTimeout(invTimer.current); invTimer.current = null; }
+    setInvDirty(false);
+    window.db.collection('data').doc('inventory').get().then(invDoc => {
+      if (!invDoc.exists) return;
+      const d = invDoc.data();
+      if (d.prendas?.length)  setPrendas(d.prendas);
+      if (d.stock)            setStock(d.stock);
+      if (d.designs?.length)  setDesigns(d.designs);
+      if (d.dtfSizes?.length) setDtfSizes(d.dtfSizes);
+      if (d.dtfStock?.length) setDtfStock(d.dtfStock);
+    }).catch(e => console.warn('Inv cancel:', e));
   };
 
   // Flush pending saves when the tab is closed/hidden — prevents data loss on quick exit
@@ -4098,6 +4167,7 @@ function App({ onLogout }) {
   refetchInv.current = () => {
     if (!invReadyRef.current) return;
     if (invTimer.current) return; // a write is pending; don't clobber local edits
+    if (invDirtyRef.current) return; // user has unsaved manual edits; don't clobber them
     window.db.collection('data').doc('inventory').get().then(invDoc => {
       if (!invDoc.exists) return;
       const d = invDoc.data();
@@ -4125,8 +4195,9 @@ function App({ onLogout }) {
     };
   }, []);
 
-  const addStock   = (key, delta) => { setStock(prev => ({ ...prev, [key]: Math.max(0, (prev[key] || 0) + delta) })); scheduleInvSave(); };
-  const setStockVal = (key, val)  => { setStock(prev => ({ ...prev, [key]: Math.max(0, val) })); scheduleInvSave(); };
+  // Manual stock edits — stay local until user clicks GUARDAR
+  const addStock   = (key, delta) => { setStock(prev => ({ ...prev, [key]: Math.max(0, (prev[key] || 0) + delta) })); markInvDirty(); };
+  const setStockVal = (key, val)  => { setStock(prev => ({ ...prev, [key]: Math.max(0, val) })); markInvDirty(); };
 
   // ── Firebase: cargar datos al iniciar ──
   useE(() => {
@@ -4458,14 +4529,15 @@ function App({ onLogout }) {
           {route === 'ventas'     && <Ventas orders={orders} onOrderUpdate={handleOrderUpdate} onOrderDelete={handleDeleteOrder} payConfig={payConfig} designs={designs} prendas={prendas} />}
           {route === 'clientes'   && <Clientes clients={clients} setClients={setClients} orders={orders} />}
           {route === 'inventario' && <Inventario
-              prendas={prendas}   setPrendas={(v)   => { setPrendas(v);   scheduleInvSave(); }}
-              dtfSizes={dtfSizes} setDtfSizes={(v)  => { setDtfSizes(v);  scheduleInvSave(); }}
+              prendas={prendas}   setPrendas={(v)   => { setPrendas(v);   markInvDirty(); }}
+              dtfSizes={dtfSizes} setDtfSizes={(v)  => { setDtfSizes(v);  markInvDirty(); }}
               stock={stock}       addStock={addStock} setStockVal={setStockVal}
-              dtfStock={dtfStock} setDtfStock={(v)  => { setDtfStock(v);  scheduleInvSave(); }}
-              designs={designs}   setDesigns={(v)   => { setDesigns(v);   scheduleInvSave(); }}
+              dtfStock={dtfStock} setDtfStock={(v)  => { setDtfStock(v);  markInvDirty(); }}
+              designs={designs}   setDesigns={(v)   => { setDesigns(v);   markInvDirty(); }}
               designCats={designCats} setDesignCats={setDesignCats}
               setOrders={setOrders}
               saveInvNow={saveInvNow}
+              invDirty={invDirty} commitInv={commitInv} cancelInv={cancelInv}
             />}
           {route === 'metricas'   && <Metricas orders={orders} designs={designs} />}
           {route === 'config'     && <Configuracion payConfig={payConfig} setPayConfig={setPayConfig} />}

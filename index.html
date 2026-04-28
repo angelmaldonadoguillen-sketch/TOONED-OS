@@ -3237,6 +3237,11 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
     const newId = (meta.id || '').trim().toUpperCase();
     const newName = (meta.name || '').trim();
     if (!newId || !newName) return;
+    // Duplicate check — ignore the design being edited itself
+    const dupSku  = designs.find(x => x.id === newId && x.id !== oldId);
+    const dupName = designs.find(x => x.name.trim().toLowerCase() === newName.toLowerCase() && x.id !== oldId);
+    if (dupSku)  { alert(`El SKU "${newId}" ya lo tiene otro diseño.`); return; }
+    if (dupName) { alert(`Ya existe un diseño llamado "${dupName.name}".`); return; }
     setDesigns(prev => prev.map(d => d.id === oldId ? { ...d, id: newId, name: newName } : d));
     setDtfStock(prev => prev.map(s => s.design === oldId ? { ...s, design: newId } : s));
     if (setOrders) setOrders(prev => prev.map(o => ({
@@ -3268,7 +3273,12 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
   };
 
   const saveNewDesign = ({ sku, name, tag, thumb }) => {
-    setDesigns(prev => prev.find(x => x.id === sku) ? prev : [...prev, { id: sku, name, tag, thumb: thumb || null }]);
+    // Double-check duplicates at save time (NewDisenoForm also validates)
+    const dupSku  = designs.find(x => x.id === sku);
+    const dupName = designs.find(x => x.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (dupSku)  { alert(`El SKU "${sku}" ya existe en el catálogo.`); return; }
+    if (dupName) { alert(`Ya existe un diseño con el nombre "${dupName.name}".`); return; }
+    setDesigns(prev => [...prev, { id: sku, name, tag, thumb: thumb || null }]);
     setShowNew(false);
   };
 
@@ -3318,7 +3328,7 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
       )}
 
       {showNew && (
-        <NewDisenoForm onSave={saveNewDesign} onCancel={() => setShowNew(false)} designCats={designCats} setDesignCats={setDesignCats} />
+        <NewDisenoForm onSave={saveNewDesign} onCancel={() => setShowNew(false)} designCats={designCats} setDesignCats={setDesignCats} designs={designs} />
       )}
 
       {/* Design cards grid */}
@@ -3481,7 +3491,7 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
 }
 
 // New design form — simplified
-function NewDisenoForm({ onSave, onCancel, designCats = ['JDM','ANIME','STREET','OTRO'], setDesignCats }) {
+function NewDisenoForm({ onSave, onCancel, designCats = ['JDM','ANIME','STREET','OTRO'], setDesignCats, designs = [] }) {
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
   const [tag, setTag] = useState(designCats[0] || 'JDM');
@@ -3489,6 +3499,12 @@ function NewDisenoForm({ onSave, onCancel, designCats = ['JDM','ANIME','STREET',
   const [newCat, setNewCat] = useState('');
   const [thumb, setThumb] = useState(null); // base64 data URL
   const fileRef = useRef(null);
+
+  // Validación de duplicados en tiempo real
+  const skuTrimmed  = sku.trim().toUpperCase();
+  const nameTrimmed = name.trim().toLowerCase();
+  const dupSku  = skuTrimmed  && designs.find(x => x.id === skuTrimmed);
+  const dupName = nameTrimmed && designs.find(x => x.name.trim().toLowerCase() === nameTrimmed);
 
   const handleFile = (e) => {
     const file = e.target.files[0];
@@ -3506,7 +3522,7 @@ function NewDisenoForm({ onSave, onCancel, designCats = ['JDM','ANIME','STREET',
     setNewCat('');
   };
 
-  const canSave = sku.trim() && name.trim();
+  const canSave = sku.trim() && name.trim() && !dupSku && !dupName;
 
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--accent)', marginBottom: 24 }}>
@@ -3517,11 +3533,23 @@ function NewDisenoForm({ onSave, onCancel, designCats = ['JDM','ANIME','STREET',
       <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16 }}>
         <div className="field">
           <label>SKU del diseño <span className="req">*</span></label>
-          <input className="input mono" placeholder="EV-11" value={sku} onChange={e => setSku(e.target.value.toUpperCase())} />
+          <input className="input mono"
+            placeholder="EV-11"
+            value={sku}
+            onChange={e => setSku(e.target.value.toUpperCase())}
+            style={{ borderColor: dupSku ? 'var(--accent)' : undefined }}
+          />
+          {dupSku && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--accent)', letterSpacing: '0.08em', marginTop: 4 }}>⚠ SKU ya existe</div>}
         </div>
         <div className="field" style={{ gridColumn: 'span 2' }}>
           <label>Nombre del diseño <span className="req">*</span></label>
-          <input className="input" placeholder="EVO X TARMAC WHITE" value={name} onChange={e => setName(e.target.value)} />
+          <input className="input"
+            placeholder="EVO X TARMAC WHITE"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            style={{ borderColor: dupName ? 'var(--accent)' : undefined }}
+          />
+          {dupName && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--accent)', letterSpacing: '0.08em', marginTop: 4 }}>⚠ Nombre ya existe</div>}
         </div>
         <div className="field" style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--line)', paddingTop: 16 }}>
           <label>Miniatura del diseño</label>

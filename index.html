@@ -3899,10 +3899,107 @@ function Configuracion({ payConfig, setPayConfig }) {
 Object.assign(window, { Configuracion });
 </script>
 <script type="text/babel">
+// ── Acceso exclusivo ──────────────────────────────────────────
+const ACCESS_PIN = '2911';   // ← cambia este PIN cuando quieras
+
+function LoginScreen({ onAuth }) {
+  const [pin, setPin] = useS('');
+  const [error, setError] = useS(false);
+  const [shake, setShake] = useS(false);
+
+  const tryLogin = () => {
+    if (pin === ACCESS_PIN) {
+      sessionStorage.setItem('tooned-auth', '1');
+      onAuth();
+    } else {
+      setError(true);
+      setShake(true);
+      setPin('');
+      setTimeout(() => setShake(false), 500);
+    }
+  };
+
+  const handleKey = (e) => { if (e.key === 'Enter') tryLogin(); };
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0A0A0A' }}>
+      <div style={{ width: 340, textAlign: 'center' }}>
+        {/* Logo */}
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 36, letterSpacing: '-0.04em', marginBottom: 4 }}>
+          TOONED<span style={{ color: 'var(--accent)' }}>OS</span>
+        </div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--dim)', letterSpacing: '0.22em', marginBottom: 48, textTransform: 'uppercase' }}>
+          Sistema de gestión · Acceso privado
+        </div>
+
+        {/* PIN box */}
+        <div style={{
+          animation: shake ? 'shake 0.4s ease' : 'none',
+          background: 'var(--card)', border: `1px solid ${error ? 'var(--accent)' : 'var(--line)'}`,
+          padding: '32px 28px',
+        }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 20 }}>
+            Ingresa tu PIN de acceso
+          </div>
+          <input
+            type="password"
+            inputMode="numeric"
+            maxLength={8}
+            autoFocus
+            value={pin}
+            onChange={e => { setPin(e.target.value); setError(false); }}
+            onKeyDown={handleKey}
+            style={{
+              width: '100%', textAlign: 'center', fontSize: 32, fontWeight: 700,
+              fontFamily: 'var(--font-mono)', letterSpacing: '0.3em',
+              background: '#0B0B0B', border: `2px solid ${error ? 'var(--accent)' : pin ? 'var(--accent)' : 'var(--line)'}`,
+              color: 'var(--text)', padding: '14px', outline: 'none',
+              boxSizing: 'border-box',
+            }}
+            placeholder="••••"
+          />
+          {error && (
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--accent)', letterSpacing: '0.12em', marginTop: 10, textTransform: 'uppercase' }}>
+              PIN incorrecto · Intenta de nuevo
+            </div>
+          )}
+          <button
+            onClick={tryLogin}
+            className="btn primary"
+            style={{ width: '100%', padding: '14px', marginTop: 20, fontSize: 12, letterSpacing: '0.18em' }}
+          >
+            ENTRAR AL SISTEMA
+          </button>
+        </div>
+
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--dim)', letterSpacing: '0.1em', marginTop: 24, textTransform: 'uppercase' }}>
+          TOONED HN · Uso exclusivo
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes shake {
+          0%,100% { transform: translateX(0); }
+          20%      { transform: translateX(-8px); }
+          40%      { transform: translateX(8px); }
+          60%      { transform: translateX(-6px); }
+          80%      { transform: translateX(6px); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // Main App shell
 const { useState: useS, useEffect: useE } = React;
 
 function App() {
+  const [authed, setAuthed] = useS(() => sessionStorage.getItem('tooned-auth') === '1');
+
+  if (!authed) return <LoginScreen onAuth={() => setAuthed(true)} />;
+
+  const logout = () => { sessionStorage.removeItem('tooned-auth'); setAuthed(false); };
+
   const [route, setRoute] = useS(() => localStorage.getItem('tooned-route') || 'nueva');
   const [orderKey, setOrderKey] = useS(0);
   const [orders, setOrders] = useS(SAMPLE_ORDERS);
@@ -4263,6 +4360,7 @@ function App() {
             <span className="chip">USR <span className="v">ADMIN</span></span>
             <span className="chip">{new Date().toLocaleDateString('es-HN', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase()}</span>
             <button className="btn sm ghost" onClick={() => setTweaksOpen(o => !o)}><Icon name="sliders" size={12} /> TWEAKS</button>
+            <button className="btn sm ghost" onClick={logout} style={{ color: 'var(--muted)', borderColor: 'var(--line)' }} title="Cerrar sesión">⏻</button>
           </div>
         </div>
 

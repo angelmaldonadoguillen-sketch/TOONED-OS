@@ -1566,6 +1566,14 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
   const prendaObj = prendas.find(p => p.id === pendingPrenda);
   const availableColors = prendaObj ? prendaObj.colors : [];
   const availableSizes = prendaObj ? prendaObj.sizes : [];
+  const [designSearch, setDesignSearch] = useState('');
+
+  const filteredDesigns = designSearch.trim()
+    ? designs.filter(d => {
+        const q = designSearch.toLowerCase();
+        return d.name?.toLowerCase().includes(q) || d.id?.toLowerCase().includes(q) || d.tag?.toLowerCase().includes(q);
+      })
+    : designs;
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16 }}>
@@ -1627,19 +1635,35 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
           </div>
 
           <div style={{ opacity: pendingPrenda && pendingColor && pendingSize ? 1 : 0.35, pointerEvents: pendingPrenda && pendingColor && pendingSize ? 'auto' : 'none' }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 10, display: 'flex', justifyContent: 'space-between' }}>
-              <span>D · Diseño DTF del catálogo</span>
-              <span className="dim">{designs.length} DISEÑOS</span>
+            {/* Header con label + buscador + contador */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', flexShrink: 0 }}>D · Diseño DTF</span>
+              <input
+                type="text"
+                placeholder="Buscar diseño..."
+                value={designSearch}
+                onChange={e => setDesignSearch(e.target.value)}
+                style={{ flex: 1, background: '#0B0B0B', border: '1px solid var(--line)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 11, padding: '5px 10px', outline: 'none', letterSpacing: '0.04em' }}
+                onFocus={e => e.target.style.borderColor = 'var(--accent)'}
+                onBlur={e => e.target.style.borderColor = 'var(--line)'}
+              />
+              <span className="mono" style={{ fontSize: 10, color: 'var(--dim)', flexShrink: 0 }}>
+                {filteredDesigns.length}/{designs.length}
+              </span>
             </div>
+            {/* Grid con scroll fijo */}
+            <div style={{ maxHeight: 340, overflowY: 'auto', paddingRight: 4 }}>
             <div className="catalog-grid">
-              {/* Sin diseño */}
+              {/* Sin diseño — siempre visible aunque se esté buscando */}
+              {!designSearch.trim() && (
               <div className={`catalog-card ${pendingDesign === '__none__' ? 'on' : ''}`} onClick={() => setPendingDesign('__none__')}
                 style={{ borderStyle: 'dashed', opacity: 0.85 }}>
                 <div className="thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: 'var(--dim)' }}>∅</div>
                 <div className="nm"><span>Sin diseño</span></div>
                 <div className="cat-cost"><span style={{ color: 'var(--dim)' }}>Solo prenda · Sin DTF</span></div>
               </div>
-              {designs.map(d => {
+              )}
+              {filteredDesigns.map(d => {
                 const stk = dtfStock.filter(s => s.design === d.id).reduce((a, s) => a + s.qty, 0);
                 const cost = getDesignCost(d);
                 const agotado = stk === 0;
@@ -1669,6 +1693,7 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
                 );
               })}
             </div>
+            </div>{/* fin scroll wrapper */}
           </div>
 
           <button className="btn primary" disabled={!pendingPrenda || !pendingColor || !pendingSize || !pendingDesign} onClick={addItem} style={{ alignSelf: 'flex-start', padding: '12px 18px' }}>

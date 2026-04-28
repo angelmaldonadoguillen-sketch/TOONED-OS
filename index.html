@@ -1694,23 +1694,20 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
             const d = i.d === '__none__' ? { name: 'Sin diseño' } : designs.find(x => x.id === i.d);
             const shirtHex = c?.hex || '#1A1A1A';
             return (
-              <div key={i.id} className="line-item" style={{ gridTemplateColumns: '44px 1fr auto auto 28px', gap: 8, alignItems: 'center' }}>
-                {/* Mini mockup: color de prenda + thumb del diseño DTF */}
-                <div style={{ width: 44, height: 44, border: '1px solid var(--line)', position: 'relative', flexShrink: 0, overflow: 'hidden', background: shirtHex }}>
-                  {/* Diseño encima del color, escalado al 85% para que se vea el color de fondo alrededor */}
-                  {i.d !== '__none__' && (
-                    <div style={{ position: 'absolute', inset: 3, overflow: 'hidden' }}>
-                      {d?.thumb
-                        ? <img src={d.thumb} alt={d?.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              <div key={i.id} className="line-item" style={{ gridTemplateColumns: '62px 1fr auto auto 28px', gap: 8, alignItems: 'center' }}>
+                {/* Mini mockup: swatch de color + thumb del diseño */}
+                <div style={{ display: 'flex', gap: 4, flexShrink: 0, alignItems: 'center' }}>
+                  {/* Swatch explícito del color de la prenda */}
+                  <div style={{ width: 14, height: 44, background: shirtHex, border: `1px solid ${c?.border || 'var(--line)'}`, flexShrink: 0 }} title={c?.name || ''} />
+                  {/* Thumbnail del diseño */}
+                  <div style={{ width: 40, height: 44, border: '1px solid var(--line)', position: 'relative', overflow: 'hidden', background: '#111', flexShrink: 0 }}>
+                    {i.d === '__none__'
+                      ? <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: 'var(--dim)' }}>∅</div>
+                      : d?.thumb
+                        ? <img src={d.thumb} alt={d?.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                         : <CatThumb id={i.d} />
-                      }
-                    </div>
-                  )}
-                  {i.d === '__none__' && (
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: 'rgba(128,128,128,0.6)' }}>∅</div>
-                  )}
-                  {/* Barra de color en la parte inferior para reforzar el color de la prenda */}
-                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 5, background: shirtHex, borderTop: `1px solid ${c?.border || 'rgba(255,255,255,0.15)'}` }} />
+                    }
+                  </div>
                 </div>
                 <div className="info">
                   <div className="pname">{d?.name || 'Sin diseño'}</div>

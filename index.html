@@ -77,6 +77,14 @@ input, select, textarea { font-family: inherit; color: inherit; }
   display: flex;
   align-items: center;
   gap: 10px;
+  transition: background 0.15s;
+  user-select: none;
+}
+.sidebar-brand:hover {
+  background: var(--card);
+}
+.sidebar-brand:active {
+  background: var(--card-2);
 }
 .wordmark {
   font-family: var(--font-display);
@@ -4573,7 +4581,10 @@ function App({ onLogout }) {
     <div className={`app ${tweaks.sidebarCollapsed ? 'collapsed' : ''}`} data-screen-label={currentModule?.label}>
       {/* Sidebar */}
       <aside className="sidebar">
-        <div className="sidebar-brand">
+        <div className="sidebar-brand"
+          onClick={() => setRoute('nueva')}
+          title="Inicio — Nueva venta"
+          style={{ cursor: 'pointer' }}>
           {!tweaks.sidebarCollapsed && (
             <div>
               <div className="wordmark">TOONED<span className="dot">.</span></div>

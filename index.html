@@ -45,7 +45,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 14px; -webkit-font-smoothing: antialiased; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
 body { min-height: 100vh; overflow: hidden; }
 
 button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
@@ -106,7 +106,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
   margin-top: 4px;
 }
 .sidebar-section {
-  padding: 16px 14px 6px;
+  padding: 20px 14px 8px;
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
@@ -117,13 +117,13 @@ input, select, textarea { font-family: inherit; color: inherit; }
   padding: 4px 8px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 .nav-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 10px;
+  padding: 11px 10px;
   border-radius: 2px;
   color: var(--muted);
   font-weight: 500;
@@ -163,12 +163,12 @@ input, select, textarea { font-family: inherit; color: inherit; }
   overflow: hidden;
 }
 .topbar {
-  height: 52px;
+  height: 56px;
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
-  padding: 0 20px;
-  gap: 16px;
+  padding: 0 24px;
+  gap: 18px;
   flex-shrink: 0;
   background: var(--bg);
 }
@@ -199,7 +199,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
 .content {
   flex: 1;
   overflow: auto;
-  padding: 24px;
+  padding: 32px 36px;
 }
 .content::-webkit-scrollbar { width: 10px; height: 10px; }
 .content::-webkit-scrollbar-track { background: transparent; }
@@ -210,9 +210,9 @@ input, select, textarea { font-family: inherit; color: inherit; }
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 24px;
-  padding-bottom: 20px;
-  margin-bottom: 20px;
+  gap: 28px;
+  padding-bottom: 28px;
+  margin-bottom: 32px;
   border-bottom: 1px solid var(--line);
 }
 .page-title {
@@ -221,6 +221,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
   font-size: 42px;
   line-height: 0.95;
   letter-spacing: -0.03em;
+  margin-bottom: 2px;
 }
 .page-kicker {
   font-family: var(--font-mono);
@@ -228,12 +229,14 @@ input, select, textarea { font-family: inherit; color: inherit; }
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--accent);
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 .page-desc {
   color: var(--muted);
   font-size: 13px;
-  max-width: 440px;
+  line-height: 1.65;
+  max-width: 480px;
+  margin-top: 10px;
 }
 
 /* ============ PANEL ============ */
@@ -243,7 +246,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
   position: relative;
 }
 .panel-head {
-  padding: 14px 16px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
@@ -257,8 +260,8 @@ input, select, textarea { font-family: inherit; color: inherit; }
   color: var(--text);
 }
 .panel-title .dim { color: var(--muted); }
-.panel-body { padding: 16px; }
-.panel-footer { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+.panel-body { padding: 20px; }
+.panel-footer { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
 
 /* crop marks */
 .crop .panel-head::before,
@@ -294,7 +297,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ============ FORM ============ */
-.field { display: flex; flex-direction: column; gap: 6px; }
+.field { display: flex; flex-direction: column; gap: 8px; }
 .field label {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -306,7 +309,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
 .input, .select, .textarea {
   background: #0B0B0B;
   border: 1px solid var(--line);
-  padding: 11px 12px;
+  padding: 12px 14px;
   color: var(--text);
   font-size: 13px;
   outline: none;
@@ -417,7 +420,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
 }
 .kpi {
   background: var(--card);
-  padding: 18px 18px 22px;
+  padding: 22px 20px 26px;
   position: relative;
 }
 .kpi .label {
@@ -629,17 +632,17 @@ input, select, textarea { font-family: inherit; color: inherit; }
 .line-item {
   display: grid;
   grid-template-columns: 48px 1fr auto auto;
-  gap: 14px;
+  gap: 16px;
   align-items: center;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid var(--line);
   background: var(--surface);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .line-item .idx {
   font-family: var(--font-mono); font-size: 11px; color: var(--dim); letter-spacing: 0.08em;
 }
-.line-item .info { display: flex; flex-direction: column; gap: 3px; }
+.line-item .info { display: flex; flex-direction: column; gap: 5px; }
 .line-item .pname { font-family: var(--font-display); font-weight: 700; font-size: 14px; }
 .line-item .pdetails {
   font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.06em;
@@ -650,17 +653,18 @@ input, select, textarea { font-family: inherit; color: inherit; }
   font-size: 11px;
   text-align: right;
   color: var(--muted);
+  line-height: 1.6;
 }
-.line-item .cost-breakdown .total { display: block; color: var(--text); font-weight: 600; font-size: 13px; margin-top: 2px; }
+.line-item .cost-breakdown .total { display: block; color: var(--text); font-weight: 600; font-size: 13px; margin-top: 4px; }
 
 /* summary box */
 .summary-row {
-  display: flex; justify-content: space-between; padding: 8px 0;
+  display: flex; justify-content: space-between; padding: 10px 0;
   font-family: var(--font-mono); font-size: 12px;
 }
 .summary-row.big {
   font-family: var(--font-display); font-weight: 800; font-size: 28px; letter-spacing: -0.02em;
-  padding: 14px 0; border-top: 1px solid var(--line); margin-top: 8px;
+  padding: 16px 0; border-top: 1px solid var(--line); margin-top: 10px;
 }
 .summary-row.big .r { font-family: var(--font-mono); }
 .summary-row .l { color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; font-size: 10px; align-self: center; }
@@ -863,23 +867,23 @@ hr.divider { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
 
 /* little ticker at top */
 .ticker {
-  height: 24px;
+  height: 32px;
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
-  padding: 0 20px;
+  padding: 0 24px;
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.12em;
   color: var(--muted);
-  gap: 24px;
+  gap: 28px;
   text-transform: uppercase;
   background: #060606;
   overflow: hidden;
   white-space: nowrap;
   flex-shrink: 0;
 }
-.ticker .item { display: inline-flex; gap: 8px; align-items: center; }
+.ticker .item { display: inline-flex; gap: 10px; align-items: center; }
 .ticker .item .v { color: var(--text); }
 .ticker .sep { color: var(--dim); }
 
@@ -2850,11 +2854,11 @@ function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStoc
         });
         if (alerts.length === 0) return null;
         return (
-          <div style={{ marginBottom: 20, padding: '12px 16px', background: '#1A1200', border: '1px solid var(--warn)', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-            <span style={{ color: 'var(--warn)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>⚠ STOCK BAJO</span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
+          <div style={{ marginBottom: 24, padding: '14px 20px', background: '#1A1200', border: '1px solid var(--warn)', display: 'flex', gap: 18, alignItems: 'flex-start' }}>
+            <span style={{ color: 'var(--warn)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 2, letterSpacing: '0.1em' }}>⚠ STOCK BAJO</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 18px' }}>
               {alerts.map((a, i) => (
-                <span key={i} className="mono" style={{ fontSize: 10, color: a.includes('AGOTADO') ? 'var(--accent)' : 'var(--warn)', letterSpacing: '0.06em' }}>{a}</span>
+                <span key={i} className="mono" style={{ fontSize: 11, color: a.includes('AGOTADO') ? 'var(--accent)' : 'var(--warn)', letterSpacing: '0.06em' }}>{a}</span>
               ))}
             </div>
           </div>

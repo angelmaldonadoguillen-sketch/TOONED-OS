@@ -2299,20 +2299,9 @@ function Metricas({ orders = [], designs = [] }) {
     });
   }, [orders, period]);
 
-  // Resumen del día — siempre calculado desde TODOS los pedidos de hoy
-  const cajaHoy = useMemo(() => {
-    const hoy = activeOrders.filter(o => o.fecha === todayStr);
-    const bruta = hoy.reduce((a,o) => a + o.total, 0);
-    const inv   = hoy.reduce((a,o) => a + calcInversion(o), 0);
-    const com   = hoy.reduce((a,o) => a + (o.comision||0), 0);
-    const cobrado   = hoy.filter(o => !o.payStatus.endsWith('-pending')).reduce((a,o) => a + o.total, 0);
-    const pendiente = hoy.filter(o =>  o.payStatus.endsWith('-pending')).reduce((a,o) => a + o.total, 0);
-    return { pedidos: hoy.length, bruta, ganancia: bruta - inv - com, cobrado, pendiente };
-  }, [orders]);
-
   // Use costs saved on the order (shirtCost / dtfCost) — set at order-creation time.
   // Falls back to catalog lookup for orders created before these fields existed.
-  const calcInversion = (o) => o.items.reduce((a, i) => {
+  const calcInversion = (o) => (o.items || []).reduce((a, i) => {
     const cost = (i.shirtCost != null && i.dtfCost != null)
       ? i.shirtCost + i.dtfCost
       : (() => {
@@ -2323,9 +2312,20 @@ function Metricas({ orders = [], designs = [] }) {
     return a + cost * (i.q || 1);
   }, 0);
 
+  // Resumen del día — siempre calculado desde TODOS los pedidos de hoy
+  const cajaHoy = useMemo(() => {
+    const hoy = activeOrders.filter(o => o.fecha === todayStr);
+    const bruta = hoy.reduce((a,o) => a + o.total, 0);
+    const inv   = hoy.reduce((a,o) => a + calcInversion(o), 0);
+    const com   = hoy.reduce((a,o) => a + (o.comision||0), 0);
+    const cobrado   = hoy.filter(o => !o.payStatus?.endsWith('-pending')).reduce((a,o) => a + o.total, 0);
+    const pendiente = hoy.filter(o =>  o.payStatus?.endsWith('-pending')).reduce((a,o) => a + o.total, 0);
+    return { pedidos: hoy.length, bruta, ganancia: bruta - inv - com, cobrado, pendiente };
+  }, [orders]);
+
   const kpis = useMemo(() => {
     const bruta       = filteredOrders.reduce((a,o) => a + o.total, 0);
-    const recolectado = filteredOrders.filter(o => !o.payStatus.endsWith('-pending')).reduce((a,o) => a + o.total, 0);
+    const recolectado = filteredOrders.filter(o => !o.payStatus?.endsWith('-pending')).reduce((a,o) => a + o.total, 0);
     const inversion   = filteredOrders.reduce((a,o) => a + calcInversion(o), 0);
     const comisiones  = filteredOrders.reduce((a,o) => a + (o.comision||0), 0);
     const ganancia    = bruta - inversion - comisiones;
@@ -2374,7 +2374,7 @@ function Metricas({ orders = [], designs = [] }) {
       const key=`${MES_LABELS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
       if (!map[key]) map[key]={mes:key,bruta:0,recolectada:0,inversion:0,comisiones:0,year:d.getFullYear(),month:d.getMonth()};
       map[key].bruta+=o.total;
-      if (!o.payStatus.endsWith('-pending')) map[key].recolectada+=o.total;
+      if (!o.payStatus?.endsWith('-pending')) map[key].recolectada+=o.total;
       map[key].inversion+=calcInversion(o);
       map[key].comisiones+=(o.comision||0);
     });

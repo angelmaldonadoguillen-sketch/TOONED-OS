@@ -44,12 +44,12 @@
   --row-h: 40px;
 }
 
-* { box-sizing: border-box; }
+* { box-sizing: border-box; cursor: default; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
 body { min-height: 100vh; overflow: hidden; }
 
 button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
-input, select, textarea { font-family: inherit; color: inherit; }
+input, select, textarea { font-family: inherit; color: inherit; cursor: text; }
 
 .mono { font-family: var(--font-mono); font-feature-settings: 'ss01'; }
 .display { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em; }
@@ -222,8 +222,6 @@ input, select, textarea { font-family: inherit; color: inherit; }
   line-height: 0.95;
   letter-spacing: -0.03em;
   margin-bottom: 2px;
-  cursor: default;
-  user-select: none;
 }
 .page-kicker {
   font-family: var(--font-mono);
@@ -232,8 +230,6 @@ input, select, textarea { font-family: inherit; color: inherit; }
   text-transform: uppercase;
   color: var(--accent);
   margin-bottom: 12px;
-  cursor: default;
-  user-select: none;
 }
 .page-desc {
   color: var(--muted);
@@ -241,7 +237,6 @@ input, select, textarea { font-family: inherit; color: inherit; }
   line-height: 1.65;
   max-width: 480px;
   margin-top: 10px;
-  cursor: default;
 }
 
 /* ============ PANEL ============ */

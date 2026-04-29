@@ -953,6 +953,15 @@ window.__TWEAKS__ = { ...TWEAK_DEFAULTS };
 <script type="text/babel">
 // Data & constants for TOONED OS
 const L = (n) => `L ${n.toLocaleString('es-HN', { maximumFractionDigits: 0 })}`;
+const formatTs = (iso) => {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    const date = d.toLocaleDateString('es-HN', { day: '2-digit', month: '2-digit' });
+    const time = d.toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit', hour12: false });
+    return `${date} ${time}`;
+  } catch { return iso.slice(0, 16); }
+};
 
 // Prendas — simplified to the 4 personalizable types
 const PRENDAS = [
@@ -2798,6 +2807,21 @@ function OrderModal({ order: o, designs, prendas, onClose, onUpdateEstado, onUpd
                 </div>
               </div>
 
+              {/* Estado history timeline */}
+              {(o.estadoLog || []).length > 0 && (
+                <div style={{ marginTop: -8 }}>
+                  <div className="mono" style={{ fontSize: 9, color: 'var(--dim)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 6 }}>Historial de estados</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {[...(o.estadoLog)].reverse().map((entry, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', background: idx === 0 ? '#0B120B' : 'transparent', borderLeft: `2px solid ${idx === 0 ? 'var(--ok)' : 'var(--line-2)'}` }}>
+                        <span className="mono" style={{ fontSize: 10, color: idx === 0 ? 'var(--ok)' : 'var(--muted)' }}>{STATUS_LABELS[entry.estado] || entry.estado}</span>
+                        <span className="mono" style={{ fontSize: 9, color: 'var(--dim)' }}>{formatTs(entry.ts)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Pay status */}
               <div>
                 <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 8 }}>Estado de pago</div>
@@ -2921,7 +2945,7 @@ function seedStock() {
   return s;
 }
 
-function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStock, setStockVal, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow, invDirty, commitInv, cancelInv, invSaving }) {
+function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStock, setStockVal, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow, stockMovLog = [], invDirty, commitInv, cancelInv, invSaving }) {
   const [tab, setTab] = useState('prendas');
   const [confirmCancel, setConfirmCancel] = useState(false);
 
@@ -2989,8 +3013,9 @@ function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStoc
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--line)', marginBottom: 32 }}>
         {[
-          { id: 'prendas', label: 'Prendas en stock', sub: `${totalPrendas} unidades` },
-          { id: 'disenos', label: 'Diseños pre-impresos', sub: `${totalDTF} unidades` },
+          { id: 'prendas',    label: 'Prendas en stock',    sub: `${totalPrendas} unidades` },
+          { id: 'disenos',    label: 'Diseños pre-impresos', sub: `${totalDTF} unidades` },
+          { id: 'movimientos', label: 'Movimientos',         sub: `${stockMovLog.length} registros` },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             padding: '16px 28px', textAlign: 'left',
@@ -3033,6 +3058,86 @@ function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStoc
 
       {tab === 'prendas' && <PrendasStockTab prendas={prendas} setPrendas={setPrendas} stock={stock} addStock={addStock} setStockVal={setStockVal} />}
       {tab === 'disenos' && <DisenosTab dtfSizes={dtfSizes} setDtfSizes={setDtfSizes} dtfStock={dtfStock} setDtfStock={setDtfStock} designs={designs} setDesigns={setDesigns} designCats={designCats} setDesignCats={setDesignCats} setOrders={setOrders} saveInvNow={saveInvNow} />}
+      {tab === 'movimientos' && <MovimientosTab log={stockMovLog} />}
+    </div>
+  );
+}
+
+// ============================================================
+// MOVIMIENTOS TAB — stock movement log
+// ============================================================
+const MOV_COLORS = {
+  venta:    { bg: '#0B1218', border: '#1E3A5F', dot: 'var(--info)',   label: 'VENTA' },
+  rebote:   { bg: '#1A1200', border: '#4A3500', dot: 'var(--warn)',   label: 'REBOTE' },
+  eliminado:{ bg: '#1A0B0B', border: '#5A1515', dot: 'var(--accent)', label: 'ELIMINADO' },
+  ajuste:   { bg: '#0B120B', border: '#1E4A1E', dot: 'var(--ok)',     label: 'AJUSTE' },
+};
+function MovimientosTab({ log }) {
+  const [filter, setFilter] = useState('');
+  const filtered = filter ? log.filter(e => e.type === filter) : log;
+  if (log.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '80px 24px', color: 'var(--dim)' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.14em', marginBottom: 8 }}>SIN REGISTROS</div>
+        <div style={{ fontSize: 13, color: 'var(--dim)' }}>Los movimientos aparecerán aquí cuando crees ventas o ajustes de stock.</div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      {/* Filter bar */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+        {['', 'venta', 'rebote', 'eliminado', 'ajuste'].map(f => {
+          const cfg = f ? MOV_COLORS[f] : null;
+          return (
+            <button key={f} onClick={() => setFilter(f)}
+              style={{ padding: '6px 14px', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em',
+                border: `1px solid ${filter === f ? (cfg?.dot || 'var(--accent)') : 'var(--line-2)'}`,
+                color: filter === f ? (cfg?.dot || 'var(--text)') : 'var(--muted)',
+                background: filter === f ? (cfg?.bg || 'transparent') : 'transparent' }}>
+              {f ? (MOV_COLORS[f]?.label || f.toUpperCase()) : 'TODOS'}
+            </button>
+          );
+        })}
+        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--dim)', alignSelf: 'center' }}>
+          {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+      {/* Log table */}
+      <div style={{ border: '1px solid var(--line)', overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '120px 80px 70px 1fr 1fr', background: '#0C0C0C', borderBottom: '1px solid var(--line)', padding: '8px 16px' }}>
+          {['FECHA', 'TIPO', 'PEDIDO', 'CLAVE', 'DESCRIPCIÓN'].map(h => (
+            <span key={h} className="mono" style={{ fontSize: 9, color: 'var(--dim)', letterSpacing: '0.14em' }}>{h}</span>
+          ))}
+        </div>
+        <div style={{ maxHeight: 520, overflowY: 'auto' }}>
+          {filtered.length === 0 ? (
+            <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--dim)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>Sin registros para este filtro</div>
+          ) : filtered.map((e, idx) => {
+            const cfg = MOV_COLORS[e.type] || MOV_COLORS.ajuste;
+            const isPos = e.delta > 0;
+            return (
+              <div key={idx} style={{ display: 'grid', gridTemplateColumns: '120px 80px 70px 1fr 1fr', padding: '9px 16px', borderBottom: '1px solid var(--line)', background: idx % 2 === 0 ? 'transparent' : '#0A0A0A', alignItems: 'center' }}>
+                <span className="mono" style={{ fontSize: 10, color: 'var(--muted)' }}>{formatTs(e.ts)}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+                  <span className="mono" style={{ fontSize: 9, color: cfg.dot, letterSpacing: '0.08em' }}>{cfg.label}</span>
+                </span>
+                <span className="mono" style={{ fontSize: 10, color: e.orderN ? 'var(--info)' : 'var(--dim)' }}>
+                  {e.orderN ? `#${e.orderN}` : '—'}
+                </span>
+                <span className="mono" style={{ fontSize: 10, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.key}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text)' }}>{e.label}</span>
+                  <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: isPos ? 'var(--ok)' : 'var(--accent)', letterSpacing: '-0.02em' }}>
+                    {isPos ? '+' : ''}{e.delta}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -4496,15 +4601,24 @@ function App({ onLogout }) {
   const [stock, setStock] = useS(seedStock);
   const [dtfStock, setDtfStock] = useS(DTF_STOCK);
   const [designs, setDesigns] = useS(CATALOG);
+  // Stock movement log — kept in memory + persisted in inventory doc (max 150 entries)
+  const [stockMovLog, setStockMovLog] = useS([]);
   // Tracks whether the user has unsaved manual edits in the Inventario page
   const [invDirty, setInvDirty] = useS(false);
   const invDirtyRef = React.useRef(false);
   invDirtyRef.current = invDirty;
   const markInvDirty = () => { if (!invDirtyRef.current) setInvDirty(true); };
+  // Stock movement log helper — prepends entry, caps at 150
+  const addMovLog = (type, orderN, key, delta, label) => {
+    setStockMovLog(prev => [
+      { ts: new Date().toISOString(), type, orderN, key, delta, label },
+      ...prev
+    ].slice(0, 150));
+  };
   const invTimer = React.useRef(null);
   // Ref always holds the latest inventory snapshot — safe to read inside async callbacks
-  const invSnap = React.useRef({ prendas, stock, designs, dtfSizes, dtfStock });
-  invSnap.current = { prendas, stock, designs, dtfSizes, dtfStock };
+  const invSnap = React.useRef({ prendas, stock, designs, dtfSizes, dtfStock, stockMovLog });
+  invSnap.current = { prendas, stock, designs, dtfSizes, dtfStock, stockMovLog };
   // Set to true synchronously once Firebase has loaded (never reset)
   const invReadyRef = React.useRef(false);
 
@@ -4607,6 +4721,7 @@ function App({ onLogout }) {
       if (d.designs?.length)  setDesigns(mergeLocalThumbs(d.designs));
       if (d.dtfSizes?.length) setDtfSizes(d.dtfSizes);
       if (d.dtfStock?.length) setDtfStock(d.dtfStock);
+      if (d.stockMovLog?.length) setStockMovLog(d.stockMovLog);
       showToast('Cambios descartados', 'info');
     }).catch(e => console.warn('Inv cancel:', e));
   };
@@ -4626,6 +4741,7 @@ function App({ onLogout }) {
       if (d.designs?.length)  setDesigns(mergeLocalThumbs(d.designs));
       if (d.dtfSizes?.length) setDtfSizes(d.dtfSizes);
       if (d.dtfStock?.length) setDtfStock(d.dtfStock);
+      if (d.stockMovLog?.length) setStockMovLog(d.stockMovLog);
     }).catch(e => console.warn('Inv resync:', e));
   };
 
@@ -4646,8 +4762,15 @@ function App({ onLogout }) {
   }, []);
 
   // Manual stock edits — stay local until user clicks GUARDAR
-  const addStock   = (key, delta) => { setStock(prev => ({ ...prev, [key]: Math.max(0, (prev[key] || 0) + delta) })); markInvDirty(); };
-  const setStockVal = (key, val)  => { setStock(prev => ({ ...prev, [key]: Math.max(0, val) })); markInvDirty(); };
+  const addStock = (key, delta) => {
+    setStock(prev => ({ ...prev, [key]: Math.max(0, (prev[key] || 0) + delta) }));
+    addMovLog('ajuste', null, key, delta, key);
+    markInvDirty();
+  };
+  const setStockVal = (key, val) => {
+    setStock(prev => ({ ...prev, [key]: Math.max(0, val) }));
+    markInvDirty();
+  };
 
   // ── Firebase: cargar datos al iniciar ──
   useE(() => {
@@ -4671,6 +4794,7 @@ function App({ onLogout }) {
         if (d.designs?.length)  setDesigns(mergeLocalThumbs(d.designs));
         if (d.dtfSizes?.length) setDtfSizes(d.dtfSizes);
         if (d.dtfStock?.length) setDtfStock(d.dtfStock);
+        if (d.stockMovLog?.length) setStockMovLog(d.stockMovLog);
       }
     }).catch(e => console.warn('Firebase load:', e)).finally(() => { setFbReady(true); invReadyRef.current = true; });
   }, []);
@@ -4738,15 +4862,19 @@ function App({ onLogout }) {
   }, [orders, stock]);
 
   const handleOrderCreated = (order) => {
-    setOrders(prev => [order, ...prev]);
-    // Deduct shirt stock
+    // Stamp initial estado log
+    const now = new Date().toISOString();
+    const orderWithLog = { ...order, estadoLog: [{ estado: order.estado || 'sin-empezar', ts: now }] };
+    setOrders(prev => [orderWithLog, ...prev]);
+    // Deduct shirt stock + log
     order.items?.forEach(i => {
       if (i.p && i.c && i.s) {
         const key = makeStockKey(i.p, i.c, i.s);
         setStock(prev => ({ ...prev, [key]: Math.max(0, (prev[key] || 0) - (i.q || 1)) }));
+        addMovLog('venta', order.n, key, -(i.q || 1), `${i.p} · ${i.c} · T${i.s}`);
       }
     });
-    // Deduct DTF stock (uses i.dtf = auto-assigned DTF size at order time)
+    // Deduct DTF stock + log (uses i.dtf = auto-assigned DTF size at order time)
     order.items?.forEach(i => {
       if (i.d && i.d !== '__none__' && i.dtf) {
         setDtfStock(prev => prev.map(s =>
@@ -4754,6 +4882,7 @@ function App({ onLogout }) {
             ? { ...s, qty: Math.max(0, s.qty - (i.q || 1)) }
             : s
         ));
+        addMovLog('venta', order.n, `dtf:${i.d}:${i.dtf}`, -(i.q || 1), `DTF ${i.d} · ${i.dtf}`);
       }
     });
     scheduleInvSave();
@@ -4787,6 +4916,7 @@ function App({ onLogout }) {
         if (i.p && i.c && i.s) {
           const key = makeStockKey(i.p, i.c, i.s);
           setStock(prev => ({ ...prev, [key]: (prev[key] || 0) + (i.q || 1) }));
+          addMovLog('rebote', n, key, +(i.q || 1), `${i.p} · ${i.c} · T${i.s}`);
         }
       });
       order.items?.forEach(i => {
@@ -4796,26 +4926,32 @@ function App({ onLogout }) {
               ? { ...s, qty: s.qty + (i.q || 1) }
               : s
           ));
+          addMovLog('rebote', n, `dtf:${i.d}:${i.dtf}`, +(i.q || 1), `DTF ${i.d} · ${i.dtf}`);
         }
       });
       scheduleInvSave();
       showToast(`Pedido #${n} marcado como rebotado · stock restaurado`, 'info');
     }
-    setOrders(prev => prev.map(o => o.n === n ? { ...o, ...patch } : o));
+    // Append to estadoLog when estado actually changes
+    const estadoPatch = (patch.estado && patch.estado !== order.estado)
+      ? { estadoLog: [...(order.estadoLog || []), { estado: patch.estado, ts: new Date().toISOString() }] }
+      : {};
+    setOrders(prev => prev.map(o => o.n === n ? { ...o, ...patch, ...estadoPatch } : o));
   };
 
   const handleDeleteOrder = (n) => {
     const order = orders.find(o => o.n === n);
     if (!order) return;
     if (!window.confirm(`¿Eliminar pedido #${n} de ${order.cliente}?\nEl stock de los items regresará al inventario.`)) return;
-    // Restore shirt stock
+    // Restore shirt stock + log
     order.items?.forEach(i => {
       if (i.p && i.c && i.s) {
         const key = makeStockKey(i.p, i.c, i.s);
         setStock(prev => ({ ...prev, [key]: (prev[key] || 0) + (i.q || 1) }));
+        addMovLog('eliminado', n, key, +(i.q || 1), `${i.p} · ${i.c} · T${i.s}`);
       }
     });
-    // Restore DTF stock (uses i.dtf = the DTF size that was deducted at order time)
+    // Restore DTF stock + log (uses i.dtf = the DTF size that was deducted at order time)
     order.items?.forEach(i => {
       if (i.d && i.d !== '__none__' && i.dtf) {
         setDtfStock(prev => {
@@ -4823,6 +4959,7 @@ function App({ onLogout }) {
           if (existing) return prev.map(s => s.design === i.d && s.size === i.dtf ? { ...s, qty: s.qty + (i.q || 1) } : s);
           return [...prev, { design: i.d, size: i.dtf, qty: i.q || 1 }];
         });
+        addMovLog('eliminado', n, `dtf:${i.d}:${i.dtf}`, +(i.q || 1), `DTF ${i.d} · ${i.dtf}`);
       }
     });
     scheduleInvSave();
@@ -4993,6 +5130,7 @@ function App({ onLogout }) {
               designCats={designCats} setDesignCats={setDesignCats}
               setOrders={setOrders}
               saveInvNow={saveInvNow}
+              stockMovLog={stockMovLog}
               invDirty={invDirty} commitInv={commitInv} cancelInv={cancelInv} invSaving={invSaving}
             />}
           {route === 'metricas'   && <Metricas orders={orders} designs={designs} />}

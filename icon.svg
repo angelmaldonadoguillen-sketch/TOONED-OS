@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="28" fill="#0A0A0A"/>
+  <rect width="192" height="192" rx="28" fill="#E63946" opacity="0.08"/>
+  <text x="96" y="134" font-family="Arial Black, Impact, sans-serif" font-weight="900" font-size="98" fill="#E63946" text-anchor="middle" letter-spacing="-4">T</text>
+  <text x="96" y="176" font-family="Arial, sans-serif" font-weight="700" font-size="18" fill="#5A5A5A" text-anchor="middle" letter-spacing="6">OS</text>
+</svg>

@@ -4,6 +4,22 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>TOONED OS</title>
+<!-- PWA -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#E63946" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="TOONED OS" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW:', e));
+    });
+  }
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Archivo+Narrow:wght@500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -1947,6 +1963,12 @@ function Step3Pago({ payment, setPayment, totals, payConfig = PAY_CONFIG_DEFAULT
   const hasComision = pm && pm.comisionPct > 0;
   const precioNum = Number(precioTotal) || 0;
   const gananciaBuena = totals.ganancia > 0;
+  // Precio mínimo para no perder plata (inversión + envío + margen mínimo 5%)
+  const costoBase = totals.inversion + (hasEnvio ? totals.envio : 0);
+  const precioMinSugerido = hasComision && pm.comisionPct > 0
+    ? Math.ceil(costoBase / (1 - pm.comisionPct / 100))
+    : costoBase;
+  const showMinHint = precioNum === 0 && costoBase > 0;
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: 16 }}>
@@ -1992,19 +2014,40 @@ function Step3Pago({ payment, setPayment, totals, payConfig = PAY_CONFIG_DEFAULT
           <hr className="divider" />
 
           {/* Precio manual */}
-          <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 8 }}>¿Cuánto vas a cobrar?</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+            <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>¿Cuánto vas a cobrar?</div>
+            {showMinHint && (
+              <div className="mono" style={{ fontSize: 9, color: 'var(--info)', letterSpacing: '0.06em' }}>
+                mínimo recomendado: {L(precioMinSugerido)}
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
             <span className="mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--muted)' }}>L</span>
             <input
               type="number"
               min="0"
-              placeholder="0"
+              placeholder={precioMinSugerido > 0 ? String(precioMinSugerido) : '0'}
               value={precioTotal}
               onChange={e => setPrecioTotal(e.target.value)}
               className="mono"
-              style={{ flex: 1, fontSize: 28, fontWeight: 700, background: '#0B0B0B', border: `2px solid ${precioNum > 0 ? 'var(--accent)' : 'var(--line)'}`, color: 'var(--text)', padding: '10px 14px', outline: 'none', letterSpacing: '-0.02em' }}
+              style={{ flex: 1, fontSize: 28, fontWeight: 700, background: '#0B0B0B', border: `2px solid ${precioNum > 0 ? (gananciaBuena ? 'var(--accent)' : 'var(--danger)') : 'var(--line)'}`, color: 'var(--text)', padding: '10px 14px', outline: 'none', letterSpacing: '-0.02em' }}
             />
           </div>
+
+          {/* Advertencia si precio < costo */}
+          {precioNum > 0 && !gananciaBuena && (
+            <div style={{ marginBottom: 12, padding: '10px 14px', background: '#1A0808', border: '1px solid var(--danger)', borderLeft: '4px solid var(--danger)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div className="mono" style={{ fontSize: 10, fontWeight: 700, color: 'var(--danger)', letterSpacing: '0.14em' }}>⚠ PRECIO BAJO EL COSTO</div>
+                <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>Estás perdiendo {L(Math.abs(totals.ganancia))} en esta venta</div>
+              </div>
+              <button onClick={() => setPrecioTotal(String(precioMinSugerido))}
+                style={{ padding: '6px 10px', border: '1px solid var(--danger)', color: 'var(--danger)', fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.1em', whiteSpace: 'nowrap' }}>
+                USAR {L(precioMinSugerido)}
+              </button>
+            </div>
+          )}
 
           {/* Resultado */}
           {precioNum > 0 ? (
@@ -2015,7 +2058,6 @@ function Step3Pago({ payment, setPayment, totals, payConfig = PAY_CONFIG_DEFAULT
               </div>
               <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, color: gananciaBuena ? 'var(--ok)' : 'var(--accent)', marginTop: 4 }}>
                 MARGEN {totals.margen.toFixed(1)}%
-                {!gananciaBuena && <span style={{ marginLeft: 8 }}>⚠ PRECIO POR DEBAJO DEL COSTO</span>}
               </div>
             </>
           ) : (
@@ -2945,7 +2987,7 @@ function seedStock() {
   return s;
 }
 
-function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStock, setStockVal, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow, stockMovLog = [], invDirty, commitInv, cancelInv, invSaving }) {
+function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStock, setStockVal, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow, stockMovLog = [], stockThreshold = 3, invDirty, commitInv, cancelInv, invSaving }) {
   const [tab, setTab] = useState('prendas');
   const [confirmCancel, setConfirmCancel] = useState(false);
 
@@ -3030,7 +3072,7 @@ function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStoc
 
       {/* Low stock alert */}
       {(() => {
-        const LOW = 3;
+        const LOW = stockThreshold;
         const alerts = [];
         prendas.forEach(p => p.colors.forEach(c => {
           const uid = c.uid || c.id;
@@ -3056,7 +3098,7 @@ function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStoc
         );
       })()}
 
-      {tab === 'prendas' && <PrendasStockTab prendas={prendas} setPrendas={setPrendas} stock={stock} addStock={addStock} setStockVal={setStockVal} />}
+      {tab === 'prendas' && <PrendasStockTab prendas={prendas} setPrendas={setPrendas} stock={stock} addStock={addStock} setStockVal={setStockVal} stockThreshold={stockThreshold} />}
       {tab === 'disenos' && <DisenosTab dtfSizes={dtfSizes} setDtfSizes={setDtfSizes} dtfStock={dtfStock} setDtfStock={setDtfStock} designs={designs} setDesigns={setDesigns} designCats={designCats} setDesignCats={setDesignCats} setOrders={setOrders} saveInvNow={saveInvNow} />}
       {tab === 'movimientos' && <MovimientosTab log={stockMovLog} />}
     </div>
@@ -3157,14 +3199,15 @@ const BASE_COLORS = [
   { id: 'cafe',    name: 'Café',          hex: '#6B4226', border: '#4A2D18' },
 ];
 
-function PrendasStockTab({ prendas, setPrendas, stock, addStock, setStockVal }) {
-  const lowThreshold = 3;
+function PrendasStockTab({ prendas, setPrendas, stock, addStock, setStockVal, stockThreshold = 3 }) {
+  const lowThreshold = stockThreshold;
   const [editing, setEditing] = useState(null);
   const [editName, setEditName] = useState({});
   const [showNewCat, setShowNewCat] = useState(false);
   const [newCatId, setNewCatId] = useState('');
   const [newCatName, setNewCatName] = useState('');
   const [newCatSizes, setNewCatSizes] = useState(['S','M','L','XL']);
+  const [searchQ, setSearchQ] = useState('');
 
   const startEditName = (p) => {
     setEditing(p.id);
@@ -3214,12 +3257,30 @@ function PrendasStockTab({ prendas, setPrendas, stock, addStock, setStockVal }) 
     ));
   };
 
+  const displayPrendas = searchQ.trim()
+    ? prendas.filter(p =>
+        p.name.toLowerCase().includes(searchQ.toLowerCase()) ||
+        p.id.toLowerCase().includes(searchQ.toLowerCase()) ||
+        p.colors.some(c => c.name.toLowerCase().includes(searchQ.toLowerCase()))
+      )
+    : prendas;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
-      {/* Nueva categoría */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: -8 }}>
-        <button className="btn primary" style={{ padding: '12px 18px', fontSize: 12 }} onClick={() => setShowNewCat(s => !s)}>
+      {/* Buscador + Nueva categoría */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: -8 }}>
+        <div style={{ flex: 1, position: 'relative' }}>
+          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--dim)', fontSize: 13, pointerEvents: 'none' }}>⌕</span>
+          <input
+            type="text"
+            placeholder="Buscar prenda o color…"
+            value={searchQ}
+            onChange={e => setSearchQ(e.target.value)}
+            style={{ width: '100%', background: '#0B0B0B', border: '1px solid var(--line)', color: 'var(--text)', padding: '10px 12px 10px 34px', fontFamily: 'var(--font-body)', fontSize: 13, outline: 'none' }}
+          />
+        </div>
+        <button className="btn primary" style={{ padding: '12px 18px', fontSize: 12, flexShrink: 0 }} onClick={() => setShowNewCat(s => !s)}>
           <Icon name="plus" size={13} /> Nueva categoría
         </button>
       </div>
@@ -3264,7 +3325,12 @@ function PrendasStockTab({ prendas, setPrendas, stock, addStock, setStockVal }) 
         </div>
       )}
 
-      {prendas.map(p => {
+      {searchQ.trim() && displayPrendas.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--dim)', fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.1em' }}>
+          Sin resultados para "{searchQ}"
+        </div>
+      )}
+      {displayPrendas.map(p => {
         const totalForProduct = p.colors.reduce((a, c) => {
           const uid = c.uid || c.id;
           return a + p.sizes.reduce((b, sz) => b + (stock[makeStockKey(p.id, uid, sz)] || 0), 0);
@@ -4264,7 +4330,7 @@ Object.assign(window, { Clientes, ClienteForm });
 </script>
 <script type="text/babel">
 // Configuracion module
-function Configuracion({ payConfig, setPayConfig }) {
+function Configuracion({ payConfig, setPayConfig, stockThreshold = 3, setStockThreshold }) {
   const [editing, setEditing] = useState(null); // id being edited
   const [form, setForm] = useState({});
   const [showNew, setShowNew] = useState(false);
@@ -4410,6 +4476,32 @@ function Configuracion({ payConfig, setPayConfig }) {
       <div style={{ marginTop: 16, padding: '12px 16px', border: '1px solid var(--line)', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', letterSpacing: '0.06em', background: 'var(--surface)' }}>
         <span style={{ color: 'var(--dim)', marginRight: 8 }}>ℹ</span>
         El costo de envío se aplica cuando el cliente paga por adelantado. La comisión se descuenta del cálculo de ganancia en cada venta.
+      </div>
+
+      {/* Stock threshold */}
+      <div className="panel crop" style={{ marginTop: 24 }}>
+        <div className="panel-head">
+          <div className="panel-title">ALERTAS DE STOCK BAJO</div>
+        </div>
+        <div style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 24 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Umbral de stock bajo</div>
+            <div style={{ color: 'var(--muted)', fontSize: 12, lineHeight: 1.5 }}>
+              Se muestra una advertencia cuando el stock de un SKU cae a esta cantidad o menos.<br />
+              También se refleja en el ticker superior y en el panel de Inventario.
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            <button onClick={() => setStockThreshold(v => Math.max(1, v - 1))}
+              style={{ width: 36, height: 36, border: '1px solid var(--line-2)', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+            <input type="number" min="1" max="99" value={stockThreshold}
+              onChange={e => setStockThreshold(Math.max(1, Number(e.target.value) || 1))}
+              style={{ width: 64, textAlign: 'center', background: '#0B0B0B', border: '1px solid var(--accent)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 22, padding: '6px 0', outline: 'none' }} />
+            <button onClick={() => setStockThreshold(v => Math.min(99, v + 1))}
+              style={{ width: 36, height: 36, border: '1px solid var(--line-2)', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+            <span className="mono" style={{ fontSize: 11, color: 'var(--dim)', marginLeft: 4 }}>unidades</span>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -4579,12 +4671,23 @@ function App({ onLogout }) {
   const [clients, setClients] = useS(SAMPLE_CLIENTS);
   const [designCats, setDesignCats] = useS(DESIGN_CATS_DEFAULT);
   const [payConfig, setPayConfig] = useS(PAY_CONFIG_DEFAULT);
+  const [stockThreshold, setStockThreshold] = useS(3);
   const [tweaksOpen, setTweaksOpen] = useS(false);
   const [tweaks, setTweaks] = useS(window.__TWEAKS__);
   const [gSearch, setGSearch] = useS('');
   const [gSearchOpen, setGSearchOpen] = useS(false);
   const [fbReady, setFbReady] = useS(false);
   const saveTimers = React.useRef({});
+  // PWA install prompt
+  const [pwaPrompt, setPwaPrompt] = useS(null);
+  const [pwaInstalled, setPwaInstalled] = useS(false);
+  useE(() => {
+    const h = (e) => { e.preventDefault(); setPwaPrompt(e); };
+    const done = () => setPwaInstalled(true);
+    window.addEventListener('beforeinstallprompt', h);
+    window.addEventListener('appinstalled', done);
+    return () => { window.removeEventListener('beforeinstallprompt', h); window.removeEventListener('appinstalled', done); };
+  }, []);
 
   // ── Toast / snackbar system ──
   const [toast, setToast] = useS(null); // { msg, tone: 'ok'|'warn'|'info' }
@@ -4786,6 +4889,7 @@ function App({ onLogout }) {
       if (cfDoc.exists && cfDoc.data().payConfig?.length) {
         setPayConfig(cfDoc.data().payConfig);
         if (cfDoc.data().designCats?.length) setDesignCats(cfDoc.data().designCats);
+        if (cfDoc.data().stockThreshold != null) setStockThreshold(cfDoc.data().stockThreshold);
       }
       if (invDoc.exists) {
         const d = invDoc.data();
@@ -4808,7 +4912,7 @@ function App({ onLogout }) {
   };
   useE(() => { if (fbReady) fbSave('orders',  { items: orders }); },    [orders,  fbReady]);
   useE(() => { if (fbReady) fbSave('clients', { items: clients }); },   [clients, fbReady]);
-  useE(() => { if (fbReady) fbSave('config',  { payConfig, designCats }); }, [payConfig, designCats, fbReady]);
+  useE(() => { if (fbReady) fbSave('config',  { payConfig, designCats, stockThreshold }); }, [payConfig, designCats, stockThreshold, fbReady]);
   // Inventory saves are now EXPLICIT (scheduleInvSave) — never triggered reactively
   // to avoid overwriting Firebase with stale defaults during page load.
 
@@ -4855,11 +4959,10 @@ function App({ onLogout }) {
       const inv = (o.items || []).reduce((s, i) => s + ((i.shirtCost || 0) + (i.dtfCost || 0)) * (i.q || 1), 0);
       return a + (o.total || 0) - inv - (o.comision || 0);
     }, 0);
-    const lowThreshold = 3;
-    const stockBajo = Object.values(stock).filter(v => v > 0 && v <= lowThreshold).length;
+    const stockBajo = Object.values(stock).filter(v => v > 0 && v <= stockThreshold).length;
     const boxfulPend = orders.filter(o => o.payStatus === 'boxful-pending' && !['rebotado','perdido'].includes(o.estado)).length;
     return { mesLabel, ventaMes, gananciaMes, stockBajo, boxfulPend };
-  }, [orders, stock]);
+  }, [orders, stock, stockThreshold]);
 
   const handleOrderCreated = (order) => {
     // Stamp initial estado log
@@ -5078,10 +5181,18 @@ function App({ onLogout }) {
         </>}
 
         <div className="sidebar-footer">
+          {/* PWA install button */}
+          {pwaPrompt && !pwaInstalled && !tweaks.sidebarCollapsed && (
+            <button
+              onClick={() => pwaPrompt.prompt().then(r => { if (r.outcome === 'accepted') { setPwaInstalled(true); setPwaPrompt(null); } })}
+              style={{ width: '100%', marginBottom: 10, padding: '8px 12px', background: '#1A0A0E', border: '1px solid var(--accent)', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 14 }}>⬇</span> INSTALAR APP
+            </button>
+          )}
           {!tweaks.sidebarCollapsed ? (
             <>
               <span className="status-dot" />ONLINE · LOCAL<br />
-              <span style={{ color: 'var(--dim)' }}>SQLITE · 128 KB</span>
+              <span style={{ color: 'var(--dim)' }}>FIREBASE · SYNC</span>
             </>
           ) : (
             <span className="status-dot" />
@@ -5131,10 +5242,11 @@ function App({ onLogout }) {
               setOrders={setOrders}
               saveInvNow={saveInvNow}
               stockMovLog={stockMovLog}
+              stockThreshold={stockThreshold}
               invDirty={invDirty} commitInv={commitInv} cancelInv={cancelInv} invSaving={invSaving}
             />}
           {route === 'metricas'   && <Metricas orders={orders} designs={designs} />}
-          {route === 'config'     && <Configuracion payConfig={payConfig} setPayConfig={setPayConfig} />}
+          {route === 'config'     && <Configuracion payConfig={payConfig} setPayConfig={setPayConfig} stockThreshold={stockThreshold} setStockThreshold={setStockThreshold} />}
         </div>
       </div>
 

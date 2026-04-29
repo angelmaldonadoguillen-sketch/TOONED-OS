@@ -26,6 +26,7 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script>
   firebase.initializeApp({
     apiKey: "AIzaSyDjuOtF5CUQmZ9nsLDPUeTPFG6sLJZTTkE",
@@ -35,7 +36,8 @@
     messagingSenderId: "193761852127",
     appId: "1:193761852127:web:ba8d049866d581920e076a"
   });
-  window.db = firebase.firestore();
+  window.db      = firebase.firestore();
+  window.storage = firebase.storage();
 </script>
 <style>
 :root {
@@ -3822,12 +3824,28 @@ function compressImageToDataURL(file, maxPx = 320, quality = 0.72) {
   });
 }
 
+// Upload image to Firebase Storage → returns download URL.
+// Falls back to base64 compression if Storage is unavailable.
+async function uploadToStorage(file, designId) {
+  try {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const path = `designs/${designId}.${ext}`;
+    const ref = window.storage.ref(path);
+    const snapshot = await ref.put(file);
+    return await snapshot.ref.getDownloadURL();
+  } catch (e) {
+    console.warn('Storage upload failed, falling back to base64:', e);
+    return await compressImageToDataURL(file);
+  }
+}
+
 function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow }) {
   const [showNew, setShowNew] = useState(false);
   const [manageSizes, setManageSizes] = useState(false);
   const [newSize, setNewSize] = useState('');
   const [editingDesign, setEditingDesign] = useState(null);
   const [editMeta, setEditMeta] = useState({});
+  const [uploadingId, setUploadingId] = useState(null); // design ID being uploaded
 
   const getQty = (designId, size) => dtfStock.find(s => s.design === designId && s.size === size)?.qty || 0;
 
@@ -4092,8 +4110,11 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
                           : <CatThumb id={d.id} />}
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <button className="btn sm" onClick={() => document.getElementById(`thumb-${d.id}`).click()}>
-                          <Icon name="plus" size={11} /> {d.thumb ? 'Cambiar imagen' : 'Subir imagen'}
+                        <button className="btn sm" disabled={uploadingId === d.id}
+                          onClick={() => document.getElementById(`thumb-${d.id}`).click()}>
+                          {uploadingId === d.id
+                            ? <><span style={{ animation: 'tick 0.8s infinite alternate' }}>⏱</span> Subiendo…</>
+                            : <><Icon name="plus" size={11} /> {d.thumb ? 'Cambiar imagen' : 'Subir imagen'}</>}
                         </button>
                         {d.thumb && (
                           <button className="btn sm ghost" style={{ fontSize: 10 }}
@@ -4106,10 +4127,11 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
                         onChange={e => {
                           const file = e.target.files[0];
                           if (!file) return;
-                          compressImageToDataURL(file).then(dataUrl => {
-                            setDesigns(prev => prev.map(x => x.id === d.id ? { ...x, thumb: dataUrl } : x));
-                          }).catch(() => {});
                           e.target.value = '';
+                          setUploadingId(d.id);
+                          uploadToStorage(file, d.id).then(url => {
+                            setDesigns(prev => prev.map(x => x.id === d.id ? { ...x, thumb: url } : x));
+                          }).finally(() => setUploadingId(null));
                         }} />
                     </div>
                   </div>
@@ -4130,7 +4152,8 @@ function NewDisenoForm({ onSave, onCancel, designCats = ['JDM','ANIME','STREET',
   const [tag, setTag] = useState(designCats[0] || 'JDM');
   const [catManage, setCatManage] = useState(false);
   const [newCat, setNewCat] = useState('');
-  const [thumb, setThumb] = useState(null); // base64 data URL
+  const [thumb, setThumb] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
 
   // Validación de duplicados en tiempo real
@@ -4142,8 +4165,11 @@ function NewDisenoForm({ onSave, onCancel, designCats = ['JDM','ANIME','STREET',
   const handleFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    compressImageToDataURL(file).then(dataUrl => setThumb(dataUrl)).catch(() => {});
     e.target.value = '';
+    setUploading(true);
+    // Use SKU as ID if filled, otherwise a temp ID (replaced when design is saved)
+    const id = skuTrimmed || `tmp-${Date.now()}`;
+    uploadToStorage(file, id).then(url => setThumb(url)).finally(() => setUploading(false));
   };
 
   const addCat = () => {
@@ -4154,7 +4180,7 @@ function NewDisenoForm({ onSave, onCancel, designCats = ['JDM','ANIME','STREET',
     setNewCat('');
   };
 
-  const canSave = sku.trim() && name.trim() && !dupSku && !dupName;
+  const canSave = sku.trim() && name.trim() && !dupSku && !dupName && !uploading;
 
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--accent)', marginBottom: 24 }}>
@@ -4187,15 +4213,20 @@ function NewDisenoForm({ onSave, onCancel, designCats = ['JDM','ANIME','STREET',
           <label>Miniatura del diseño</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div
-              onClick={() => fileRef.current?.click()}
-              style={{ width: 96, height: 96, border: `1px solid ${thumb ? 'var(--accent)' : 'var(--line)'}`, background: '#0B0B0B', cursor: 'pointer', overflow: 'hidden', flexShrink: 0, position: 'relative' }}
+              onClick={() => !uploading && fileRef.current?.click()}
+              style={{ width: 96, height: 96, border: `1px solid ${thumb ? 'var(--accent)' : 'var(--line)'}`, background: '#0B0B0B', cursor: uploading ? 'wait' : 'pointer', overflow: 'hidden', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               title="Click para subir imagen"
             >
-              {thumb
-                ? <img src={thumb} alt="miniatura" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : <CatThumb id={sku || 'XX-00'} />
+              {uploading
+                ? <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 24, animation: 'tick 0.8s infinite alternate' }}>⏱</div>
+                    <div className="mono" style={{ fontSize: 9, color: 'var(--muted)', marginTop: 4 }}>Subiendo…</div>
+                  </div>
+                : thumb
+                  ? <img src={thumb} alt="miniatura" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <CatThumb id={sku || 'XX-00'} />
               }
-              {thumb && (
+              {thumb && !uploading && (
                 <button onClick={(e) => { e.stopPropagation(); setThumb(null); }}
                   style={{ position: 'absolute', top: 3, right: 3, background: 'rgba(0,0,0,0.8)', border: '1px solid #333', color: 'var(--accent)', fontSize: 12, padding: '1px 5px', cursor: 'pointer', zIndex: 2 }}>
                   ×
@@ -4203,8 +4234,8 @@ function NewDisenoForm({ onSave, onCancel, designCats = ['JDM','ANIME','STREET',
               )}
             </div>
             <div>
-              <button className="btn sm" onClick={() => fileRef.current?.click()}>
-                <Icon name="plus" size={11} /> {thumb ? 'Cambiar imagen' : 'Subir PNG / JPG / SVG'}
+              <button className="btn sm" disabled={uploading} onClick={() => fileRef.current?.click()}>
+                {uploading ? '⏱ Subiendo…' : <><Icon name="plus" size={11} /> {thumb ? 'Cambiar imagen' : 'Subir PNG / JPG / SVG'}</>}
               </button>
               <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
               <div className="mono" style={{ fontSize: 10, color: 'var(--dim)', letterSpacing: '0.08em', marginTop: 6, lineHeight: 1.5 }}>

@@ -44,12 +44,12 @@
   --row-h: 40px;
 }
 
-* { box-sizing: border-box; cursor: default; }
+* { box-sizing: border-box; cursor: default; user-select: none; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
 body { min-height: 100vh; overflow: hidden; }
 
 button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
-input, select, textarea { font-family: inherit; color: inherit; cursor: text; }
+input, select, textarea { font-family: inherit; color: inherit; cursor: text; user-select: text; }
 
 .mono { font-family: var(--font-mono); font-feature-settings: 'ss01'; }
 .display { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em; }

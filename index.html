@@ -3788,6 +3788,11 @@ function StockStepper({ value, low, onAdd, onSub, onChange }) {
 // Compress an image File to a small base64 JPEG (max 320px, 72% quality)
 // Keeps Firestore doc size well under 1 MB even with many designs
 function compressImageToDataURL(file, maxPx = 320, quality = 0.72) {
+  // TARGET: keep base64 string under 36 000 chars (~27 KB actual image)
+  // so thumbnails always fit inside the Firestore inventory document (1 MB limit)
+  // and are accessible from any device without needing a separate collection.
+  // Strategy: iteratively lower quality → then lower dimensions until it fits.
+  const TARGET_CHARS = 36000;
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = reject;
@@ -3795,15 +3800,21 @@ function compressImageToDataURL(file, maxPx = 320, quality = 0.72) {
       const img = new Image();
       img.onerror = reject;
       img.onload = () => {
-        const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
-        const w = Math.round(img.width  * scale);
-        const h = Math.round(img.height * scale);
-        const canvas = document.createElement('canvas');
-        canvas.width  = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        const compress = (px, q) => {
+          const scale = Math.min(1, px / Math.max(img.width, img.height));
+          const w = Math.round(img.width  * scale);
+          const h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const data = canvas.toDataURL('image/jpeg', q);
+          if (data.length > TARGET_CHARS) {
+            if (q > 0.36) return compress(px, +(q - 0.08).toFixed(2)); // lower quality
+            if (px > 100) return compress(Math.round(px * 0.75), 0.5); // lower size
+          }
+          return data; // fits or reached minimum — always resolves
+        };
+        resolve(compress(maxPx, quality));
       };
       img.src = ev.target.result;
     };

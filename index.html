@@ -1366,7 +1366,19 @@ function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], pa
   };
 
   const removeItem = (id) => setItems(prev => prev.filter(i => i.id !== id));
-  const updateItemQty = (id, delta) => setItems(prev => prev.map(i => i.id === id ? { ...i, q: Math.max(1, i.q + delta) } : i));
+  const updateItemQty = (id, delta) => setItems(prev => prev.map(i => {
+    if (i.id !== id) return i;
+    if (delta > 0) {
+      // Stock disponible = stock real − lo que otros ítems del carrito ya reservaron para p/c/s
+      const key = `${i.p}-${i.c}-${i.s}`;
+      const rawStock = stock[key] || 0;
+      const otherReserved = prev.filter(x => x.id !== id && x.p === i.p && x.c === i.c && x.s === i.s)
+                                 .reduce((a, x) => a + (x.q || 0), 0);
+      const available = Math.max(0, rawStock - otherReserved);
+      if (i.q >= available) return i; // ya está en el límite del stock
+    }
+    return { ...i, q: Math.max(1, i.q + delta) };
+  }));
 
   const totals = useMemo(() => {
     const precio = Number(precioTotal) || 0;
@@ -1838,11 +1850,19 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
                     PRENDA {L(i.shirtCost)}{i.dtfCost > 0 ? ` + DTF ${L(i.dtfCost)}` : ' · SIN DTF'}
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 0, border: '1px solid var(--line)', height: 28, alignSelf: 'center' }}>
-                  <button onClick={() => updateItemQty(i.id, -1)} style={{ padding: '0 8px', color: 'var(--muted)', fontSize: 16, height: '100%', borderRight: '1px solid var(--line)' }}>−</button>
-                  <span className="mono" style={{ fontSize: 12, fontWeight: 700, padding: '0 10px' }}>{i.q}</span>
-                  <button onClick={() => updateItemQty(i.id, 1)} style={{ padding: '0 8px', color: 'var(--accent)', fontSize: 16, height: '100%', borderLeft: '1px solid var(--line)' }}>+</button>
-                </div>
+                {(() => {
+                  const key = `${i.p}-${i.c}-${i.s}`;
+                  const rawStock = stock[key] || 0;
+                  const otherReserved = items.filter(x => x.id !== i.id && x.p === i.p && x.c === i.c && x.s === i.s).reduce((a, x) => a + (x.q || 0), 0);
+                  const atMax = i.q >= Math.max(0, rawStock - otherReserved);
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 0, border: '1px solid var(--line)', height: 28, alignSelf: 'center' }}>
+                      <button onClick={() => updateItemQty(i.id, -1)} style={{ padding: '0 8px', color: 'var(--muted)', fontSize: 16, height: '100%', borderRight: '1px solid var(--line)' }}>−</button>
+                      <span className="mono" style={{ fontSize: 12, fontWeight: 700, padding: '0 10px' }}>{i.q}</span>
+                      <button onClick={() => updateItemQty(i.id, 1)} disabled={atMax} style={{ padding: '0 8px', color: atMax ? 'var(--dim)' : 'var(--accent)', fontSize: 16, height: '100%', borderLeft: '1px solid var(--line)', opacity: atMax ? 0.4 : 1 }} title={atMax ? 'Stock agotado' : ''}>+</button>
+                    </div>
+                  );
+                })()}
                 <div className="mono" style={{ fontSize: 11, color: 'var(--muted)', alignSelf: 'center', minWidth: 70, textAlign: 'right' }}>
                   {L((i.shirtCost + i.dtfCost) * i.q)}
                 </div>
@@ -2064,10 +2084,17 @@ function Metricas({ orders = [], designs = [] }) {
     });
   }, [orders, period]);
 
+  // Use costs saved on the order (shirtCost / dtfCost) — set at order-creation time.
+  // Falls back to catalog lookup for orders created before these fields existed.
   const calcInversion = (o) => o.items.reduce((a, i) => {
-    const col = SHIRT_COLORS.find(x => x.id === i.c);
-    const des = CATALOG.find(x => x.id === i.d);
-    return a + ((col?.cost || 0) + (des?.cost || 0)) * i.q;
+    const cost = (i.shirtCost != null && i.dtfCost != null)
+      ? i.shirtCost + i.dtfCost
+      : (() => {
+          const col = SHIRT_COLORS.find(x => x.id === i.c);
+          const des = CATALOG.find(x => x.id === i.d);
+          return (col?.cost || 0) + (des?.cost || 0);
+        })();
+    return a + cost * (i.q || 1);
   }, 0);
 
   const kpis = useMemo(() => {

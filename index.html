@@ -4839,15 +4839,24 @@ function App({ onLogout }) {
   // ─── Thumb helpers: keep Firestore doc under 1 MB ──────────────
   // Firestore hard limit = 1 MB per document.
   // Full-size base64 photos can be 2-5 MB each and blow the limit.
-  // Solution: thumbs > THUMB_FS_LIMIT bytes go to localStorage instead of Firestore.
-  // New uploads are compressed to ~320px JPEG (≈8-25 KB) so they always stay small.
-  const THUMB_FS_LIMIT = 40000; // 40 KB — well under Firestore per-field budget
+  // Solution: thumbs > THUMB_FS_LIMIT bytes are stored in a separate
+  // Firestore collection (thumbs/{id}) — accessible from ANY device.
+  // localStorage is kept as a fast local cache to avoid re-reads.
+  const THUMB_FS_LIMIT = 40000; // 40 KB
 
-  // Build the payload to persist: strip oversized thumbs → localStorage
+  // Save an oversized thumb to its own Firestore doc (fire-and-forget)
+  const saveCloudThumb = (id, thumb) => {
+    if (!id || !thumb) return;
+    window.db.collection('thumbs').doc(id).set({ thumb })
+      .catch(e => console.warn('Cloud thumb save:', e));
+  };
+
+  // Build the payload to persist: strip oversized thumbs → Firestore + localStorage
   const safeInvPayload = (snap) => {
     const designs = (snap.designs || []).map(d => {
       if (d.thumb && d.thumb.length > THUMB_FS_LIMIT) {
-        try { localStorage.setItem('thumb_' + d.id, d.thumb); } catch (e) {}
+        saveCloudThumb(d.id, d.thumb);                              // cross-device
+        try { localStorage.setItem('thumb_' + d.id, d.thumb); } catch (e) {} // local cache
         return { ...d, thumb: null };
       }
       return d;
@@ -4855,16 +4864,38 @@ function App({ onLogout }) {
     return { ...snap, designs };
   };
 
-  // Restore thumbs from localStorage for designs that have none stored in Firestore
+  // Step 1: restore from localStorage instantly (same device, zero latency)
+  // Step 2: migrate found localStorage thumbs to Firestore (so other devices get them too)
   const mergeLocalThumbs = (designs) =>
     (designs || []).map(d => {
       if (d.thumb) return d;
       try {
         const lt = localStorage.getItem('thumb_' + d.id);
-        if (lt) return { ...d, thumb: lt };
+        if (lt) {
+          saveCloudThumb(d.id, lt); // migrate: push to Firestore for other devices
+          return { ...d, thumb: lt };
+        }
       } catch (e) {}
       return d;
     });
+
+  // Step 3: for designs still missing thumbs, fetch from Firestore in background
+  // (cross-device: works even if this device never uploaded the image)
+  const loadCloudThumbs = (designs) => {
+    const missing = (designs || []).filter(d => !d.thumb);
+    if (missing.length === 0) return;
+    missing.forEach(d => {
+      window.db.collection('thumbs').doc(d.id).get()
+        .then(doc => {
+          if (!doc.exists) return;
+          const thumb = doc.data()?.thumb;
+          if (!thumb) return;
+          setDesigns(prev => prev.map(x => x.id === d.id ? { ...x, thumb } : x));
+          try { localStorage.setItem('thumb_' + d.id, thumb); } catch (e) {} // cache it locally
+        })
+        .catch(e => console.warn('Cloud thumb load:', d.id, e));
+    });
+  };
 
   // ─── Save strategy ─────────────────────────────────────────────
   // - Manual inventory edits are NOT auto-saved. They mark invDirty.
@@ -4932,7 +4963,7 @@ function App({ onLogout }) {
       const d = invDoc.data();
       if (d.prendas?.length)  setPrendas(d.prendas);
       if (d.stock)            setStock(d.stock);
-      if (d.designs?.length)  setDesigns(mergeLocalThumbs(d.designs));
+      if (d.designs?.length) { const merged = mergeLocalThumbs(d.designs); setDesigns(merged); loadCloudThumbs(merged); }
       if (d.dtfSizes?.length) setDtfSizes(d.dtfSizes);
       if (d.dtfStock?.length) setDtfStock(d.dtfStock);
       if (d.stockMovLog?.length) setStockMovLog(d.stockMovLog);
@@ -4952,7 +4983,7 @@ function App({ onLogout }) {
       const d = invDoc.data();
       if (d.prendas?.length)  setPrendas(d.prendas);
       if (d.stock)            setStock(d.stock);
-      if (d.designs?.length)  setDesigns(mergeLocalThumbs(d.designs));
+      if (d.designs?.length) { const merged = mergeLocalThumbs(d.designs); setDesigns(merged); loadCloudThumbs(merged); }
       if (d.dtfSizes?.length) setDtfSizes(d.dtfSizes);
       if (d.dtfStock?.length) setDtfStock(d.dtfStock);
       if (d.stockMovLog?.length) setStockMovLog(d.stockMovLog);
@@ -5006,7 +5037,7 @@ function App({ onLogout }) {
         const d = invDoc.data();
         if (d.prendas?.length)  setPrendas(d.prendas);
         if (d.stock)            setStock(d.stock);
-        if (d.designs?.length)  setDesigns(mergeLocalThumbs(d.designs));
+        if (d.designs?.length) { const merged = mergeLocalThumbs(d.designs); setDesigns(merged); loadCloudThumbs(merged); }
         if (d.dtfSizes?.length) setDtfSizes(d.dtfSizes);
         if (d.dtfStock?.length) setDtfStock(d.dtfStock);
         if (d.stockMovLog?.length) setStockMovLog(d.stockMovLog);

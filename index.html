@@ -1327,10 +1327,12 @@ function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], pa
   const [pendingColor, setPendingColor] = useState(null);
   const [pendingSize, setPendingSize] = useState(null);
   const [pendingDesign, setPendingDesign] = useState(null);
+  const [pendingDtfSize, setPendingDtfSize] = useState(null);
   const [items, setItems] = useState([]);
 
   const [payment, setPayment] = useState(null);
   const [precioTotal, setPrecioTotal] = useState('');
+  const [nota, setNota] = useState('');
 
   const steps = [
     { n: '01', t: 'Cliente' },
@@ -1348,21 +1350,16 @@ function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], pa
 
   const addItem = () => {
     if (!pendingPrenda || !pendingColor || !pendingSize || !pendingDesign) return;
+    const isNone = pendingDesign === '__none__';
+    if (!isNone && !pendingDtfSize) return; // debe elegir tamaño DTF
     const p = prendas.find(x => x.id === pendingPrenda);
     const colorObj = p?.colors.find(c => (c.uid || c.id) === pendingColor || c.id === pendingColor);
     const shirtCost = colorObj?.cost ?? 215;
-    const isNone = pendingDesign === '__none__';
     const d = isNone ? null : designs.find(x => x.id === pendingDesign);
     const dtfCost = isNone ? 0 : getDesignCost(d);
-    // Auto-pick DTF size: first size with stock > 0, otherwise first size in the list
-    const dtfSize = isNone ? null : (() => {
-      const withStock = dtfStock.filter(s => s.design === pendingDesign && s.qty > 0);
-      if (withStock.length) return withStock[0].size;
-      const anyEntry = dtfStock.find(s => s.design === pendingDesign);
-      return anyEntry?.size || null;
-    })();
-    setItems(prev => [...prev, { id: crypto.randomUUID().slice(0, 6), p: pendingPrenda, c: pendingColor, s: pendingSize, d: pendingDesign, dtf: dtfSize, q: 1, shirtCost, dtfCost }]);
+    setItems(prev => [...prev, { id: crypto.randomUUID().slice(0, 6), p: pendingPrenda, c: pendingColor, s: pendingSize, d: pendingDesign, dtf: isNone ? null : pendingDtfSize, q: 1, shirtCost, dtfCost }]);
     setPendingDesign(null);
+    setPendingDtfSize(null);
   };
 
   const removeItem = (id) => setItems(prev => prev.filter(i => i.id !== id));
@@ -1414,13 +1411,14 @@ function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], pa
         ))}
       </div>
 
-      {step === 1 && <Step1Cliente cliente={cliente} setCliente={setCliente} clients={clients} onClientCreated={onClientCreated} />}
+      {step === 1 && <Step1Cliente cliente={cliente} setCliente={setCliente} clients={clients} onClientCreated={onClientCreated} nota={nota} setNota={setNota} />}
       {step === 2 && (
         <Step2Piezas
           pendingPrenda={pendingPrenda} setPendingPrenda={(id) => { setPendingPrenda(id); setPendingColor(null); setPendingSize(null); }}
           pendingColor={pendingColor} setPendingColor={setPendingColor}
           pendingSize={pendingSize} setPendingSize={setPendingSize}
-          pendingDesign={pendingDesign} setPendingDesign={setPendingDesign}
+          pendingDesign={pendingDesign} setPendingDesign={(id) => { setPendingDesign(id); setPendingDtfSize(null); }}
+          pendingDtfSize={pendingDtfSize} setPendingDtfSize={setPendingDtfSize}
           addItem={addItem} items={items} removeItem={removeItem} updateItemQty={updateItemQty}
           prendas={prendas} designs={designs} dtfStock={dtfStock} stock={stock}
         />
@@ -1437,6 +1435,7 @@ function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], pa
             const payStatus = pm && pm.envio > 0 ? `${payment}-pending` : payment;
             onOrderCreated({
               n: nextOrderNumber, cliente: cliente.nombre, phone: cliente.contacto, ciudad: cliente.ciudad, canal: cliente.canal, direccion: cliente.direccion || '',
+              nota: nota.trim() || '',
               items: items.map(i => ({ p: i.p, c: i.c, s: i.s, d: i.d, dtf: i.dtf, q: i.q, shirtCost: i.shirtCost, dtfCost: i.dtfCost })),
               pay: payment, total: totals.precio,
               estado: 'sin-empezar', payStatus,
@@ -1461,7 +1460,7 @@ function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], pa
   );
 }
 
-function Step1Cliente({ cliente, setCliente, clients = [], onClientCreated }) {
+function Step1Cliente({ cliente, setCliente, clients = [], onClientCreated, nota, setNota }) {
   const [showMatches, setShowMatches] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
 
@@ -1558,6 +1557,14 @@ function Step1Cliente({ cliente, setCliente, clients = [], onClientCreated }) {
           <label>Dirección / punto de referencia</label>
           <textarea className="textarea" rows="2" placeholder="Col. Palmira, casa #342, calle principal..." value={cliente.direccion} onChange={e => setCliente(c => ({ ...c, direccion: e.target.value }))} />
         </div>
+        <div className="field" style={{ gridColumn: '1 / -1' }}>
+          <label>Nota del pedido <span style={{ color: 'var(--dim)', fontWeight: 400 }}>(opcional)</span></label>
+          <textarea className="textarea" rows="2"
+            placeholder="Instrucciones especiales, talla alternativa, mensaje de regalo…"
+            value={nota} onChange={e => setNota(e.target.value)}
+            style={{ resize: 'vertical', minHeight: 60 }}
+          />
+        </div>
         {onClientCreated && cliente.contacto && cliente.nombre && !exact && (
           <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#0D150D', border: '1px solid var(--ok)' }}>
             <span className="mono" style={{ fontSize: 11, color: 'var(--ok)', flex: 1 }}>
@@ -1589,7 +1596,7 @@ const getDesignCost = (d) => {
   return 0;
 };
 
-function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPendingColor, pendingSize, setPendingSize, pendingDesign, setPendingDesign, addItem, items, removeItem, updateItemQty, prendas = PRENDAS, designs = CATALOG, dtfStock = DTF_STOCK, stock = {} }) {
+function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPendingColor, pendingSize, setPendingSize, pendingDesign, setPendingDesign, pendingDtfSize, setPendingDtfSize, addItem, items, removeItem, updateItemQty, prendas = PRENDAS, designs = CATALOG, dtfStock = DTF_STOCK, stock = {} }) {
   const prendaObj = prendas.find(p => p.id === pendingPrenda);
   const availableColors = prendaObj ? prendaObj.colors : [];
   const availableSizes = prendaObj ? prendaObj.sizes : [];
@@ -1776,6 +1783,43 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
             </div>{/* fin scroll wrapper */}
           </div>
 
+          {/* Selector de tamaño DTF — solo cuando hay diseño seleccionado (no __none__) */}
+          {pendingDesign && pendingDesign !== '__none__' && (() => {
+            const sizesForDesign = dtfStock.filter(s => s.design === pendingDesign);
+            if (sizesForDesign.length === 0) return null;
+            return (
+              <div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>
+                  E · Tamaño de impresión DTF
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {sizesForDesign.map(s => {
+                    const isOn = pendingDtfSize === s.size;
+                    const agotado = s.qty === 0;
+                    return (
+                      <button key={s.size}
+                        onClick={() => !agotado && setPendingDtfSize(s.size)}
+                        disabled={agotado}
+                        style={{
+                          padding: '6px 14px', border: `1px solid ${isOn ? 'var(--accent)' : agotado ? 'var(--line)' : 'var(--line-2)'}`,
+                          background: isOn ? 'var(--accent)' : 'var(--surface)',
+                          color: isOn ? '#0A0A0A' : agotado ? 'var(--dim)' : 'var(--text)',
+                          fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+                          opacity: agotado ? 0.45 : 1,
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                        }}>
+                        <span>{s.size}</span>
+                        <span style={{ fontSize: 9, fontWeight: 400, color: isOn ? '#0A0A0A' : agotado ? 'var(--accent)' : s.qty <= 3 ? 'var(--warn)' : 'var(--ok)' }}>
+                          {agotado ? '∅ 0' : `${s.qty} ud`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Stock warning + add button */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignSelf: 'flex-start' }}>
             {pendingPrenda && pendingColor && pendingSize && shirtAgotado && (
@@ -1800,13 +1844,17 @@ function Step2Piezas({ pendingPrenda, setPendingPrenda, pendingColor, setPending
                 ⚠ STOCK BAJO · solo {currentShirtStock} disponibles
               </div>
             )}
-            <button className="btn primary"
-              disabled={!pendingPrenda || !pendingColor || !pendingSize || !pendingDesign || shirtAgotado}
-              onClick={addItem}
-              style={{ padding: '12px 18px' }}
-              title={shirtAgotado ? 'Sin stock para esta combinación' : ''}>
-              <Icon name="plus" size={13} /> {shirtAgotado ? 'Sin stock disponible' : 'Agregar pieza al pedido'}
-            </button>
+            {(() => {
+              const needsDtf = pendingDesign && pendingDesign !== '__none__';
+              const missingDtf = needsDtf && !pendingDtfSize;
+              const disabled = !pendingPrenda || !pendingColor || !pendingSize || !pendingDesign || shirtAgotado || missingDtf;
+              const label = shirtAgotado ? 'Sin stock disponible' : missingDtf ? 'Elegí tamaño DTF' : 'Agregar pieza al pedido';
+              return (
+                <button className="btn primary" disabled={disabled} onClick={addItem} style={{ padding: '12px 18px' }}>
+                  <Icon name="plus" size={13} /> {label}
+                </button>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -2310,9 +2358,12 @@ Object.assign(window, { Metricas });
 // Ventas table
 function Ventas({ orders, onOrderUpdate, onOrderDelete, designs = CATALOG, prendas = PRENDAS }) {
   const [filters, setFilters] = useState({ estado: 'all', pay: 'all', canal: 'all', fecha: 'all', q: '' });
+  const [sort, setSort] = useState({ col: 'n', dir: 'desc' }); // columna activa y dirección
   const [modalOrder, setModalOrder] = useState(null);
   const [payMenu, setPayMenu] = useState(null); // { orderN, x, y }
   const [estadoMenu, setEstadoMenu] = useState(null);
+
+  const toggleSort = (col) => setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'desc' });
 
   // Build pay-status options relevant to the order's pay method
   const payStatusOptionsFor = (pay) => {
@@ -2359,9 +2410,34 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete, designs = CATALOG, prend
     return true;
   });
 
-  const totalFiltered = filtered.reduce((a, o) => a + o.total, 0);
-  const recolectado = filtered.filter(o => !o.payStatus.endsWith('-pending') && o.payStatus !== 'boxful-pending' && !['rebotado','perdido','sin-empezar'].includes(o.estado)).reduce((a, o) => a + o.total, 0);
-  const pendienteBoxful = filtered.filter(o => (o.payStatus === 'boxful-pending' || o.payStatus.endsWith('-pending')) && !['rebotado','perdido'].includes(o.estado)).reduce((a, o) => a + o.total, 0);
+  const totalFiltered    = filtered.reduce((a, o) => a + o.total, 0);
+  const recolectado      = filtered.filter(o => !o.payStatus.endsWith('-pending') && !['rebotado','perdido','sin-empezar'].includes(o.estado)).reduce((a, o) => a + o.total, 0);
+  const pendienteBoxful  = filtered.filter(o => (o.payStatus === 'boxful-pending' || o.payStatus.endsWith('-pending')) && !['rebotado','perdido'].includes(o.estado)).reduce((a, o) => a + o.total, 0);
+
+  // Ganancia por fila — usa costos guardados en la orden (igual que Métricas)
+  const rowGanancia = (o) => {
+    const inv = (o.items || []).reduce((a, i) => a + ((i.shirtCost || 0) + (i.dtfCost || 0)) * (i.q || 1), 0);
+    return o.total - inv - (o.comision || 0);
+  };
+
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    let va, vb;
+    if (sort.col === 'n')        { va = a.n;         vb = b.n; }
+    else if (sort.col === 'total')    { va = a.total;     vb = b.total; }
+    else if (sort.col === 'ganancia') { va = rowGanancia(a); vb = rowGanancia(b); }
+    else if (sort.col === 'fecha')    { va = a.fecha;     vb = b.fecha; }
+    else if (sort.col === 'estado')   { va = a.estado;    vb = b.estado; }
+    else if (sort.col === 'cliente')  { va = a.cliente?.toLowerCase(); vb = b.cliente?.toLowerCase(); }
+    else { va = a.n; vb = b.n; }
+    if (va < vb) return sort.dir === 'asc' ? -1 : 1;
+    if (va > vb) return sort.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Indicador visual de columna ordenada
+  const SortIcon = ({ col }) => sort.col !== col ? null : (
+    <span style={{ marginLeft: 4, fontSize: 9, color: 'var(--accent)' }}>{sort.dir === 'asc' ? '▲' : '▼'}</span>
+  );
 
   return (
     <div>
@@ -2425,27 +2501,29 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete, designs = CATALOG, prend
           <table className="tbl">
             <thead>
               <tr>
-                <th>Orden</th>
-                <th>Cliente</th>
-                <th>Canal</th>
-                <th>Piezas</th>
-                <th style={{ textAlign: 'right' }}>Total</th>
-                <th style={{ textAlign: 'right' }}>Comisión</th>
-                <th style={{ textAlign: 'right' }}>Ganancia</th>
-                <th>Pago</th>
-                <th>Estado</th>
-                <th>Fecha</th>
-                <th></th>
+                {[
+                  { col: 'n',        label: 'Orden',    align: 'left' },
+                  { col: 'cliente',  label: 'Cliente',  align: 'left' },
+                  { col: null,       label: 'Canal',    align: 'left' },
+                  { col: null,       label: 'Piezas',   align: 'left' },
+                  { col: 'total',    label: 'Total',    align: 'right' },
+                  { col: null,       label: 'Comisión', align: 'right' },
+                  { col: 'ganancia', label: 'Ganancia', align: 'right' },
+                  { col: null,       label: 'Pago',     align: 'left' },
+                  { col: 'estado',   label: 'Estado',   align: 'left' },
+                  { col: 'fecha',    label: 'Fecha',    align: 'left' },
+                  { col: null,       label: '',         align: 'left' },
+                ].map(({ col, label, align }, i) => (
+                  <th key={i} style={{ textAlign: align, cursor: col ? 'pointer' : 'default', userSelect: 'none' }}
+                    onClick={col ? () => toggleSort(col) : undefined}>
+                    {label}{col && <SortIcon col={col} />}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map(o => {
-                const inversion = o.items.reduce((a, i) => {
-                  const c = SHIRT_COLORS.find(x => x.id === i.c);
-                  const d = i.d === '__none__' ? { cost: 0 } : CATALOG.find(x => x.id === i.d);
-                  return a + ((c?.cost || 0) + (d?.cost || 0)) * i.q;
-                }, 0);
-                const ganancia = o.total - inversion - (o.comision || 0);
+              {sortedFiltered.map(o => {
+                const ganancia = rowGanancia(o);
                 return (
                   <tr key={o.n} style={{ cursor: 'pointer' }} onClick={() => setModalOrder(o.n)}>
                     <td className="order-n">#{o.n}</td>
@@ -2644,6 +2722,12 @@ function OrderModal({ order: o, designs, prendas, onClose, onUpdateEstado, onUpd
                     <span style={{ fontSize: 12, fontWeight: 500, maxWidth: 160, textAlign: 'right', wordBreak: 'break-word' }}>{v}</span>
                   </div>
                 ))}
+                {o.nota && (
+                  <div style={{ marginTop: 10, padding: '10px 12px', background: '#0C120C', border: '1px solid var(--line-2)', borderLeft: '3px solid var(--ok)' }}>
+                    <div className="mono" style={{ fontSize: 9, color: 'var(--ok)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 5 }}>Nota del pedido</div>
+                    <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{o.nota}</div>
+                  </div>
+                )}
               </div>
 
               {/* Estado */}

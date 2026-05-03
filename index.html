@@ -60,6 +60,13 @@
   --font-body: 'Inter', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --row-h: 40px;
+  /* ── Radios ── */
+  --r-xs:  4px;
+  --r-sm:  8px;
+  --r-md:  12px;
+  --r-lg:  16px;
+  --r-xl:  20px;
+  --r-pill: 999px;
 }
 
 * { box-sizing: border-box; cursor: default; user-select: none; }
@@ -143,7 +150,7 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
   align-items: center;
   gap: 12px;
   padding: 11px 10px;
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   color: var(--muted);
   font-weight: 500;
   font-size: 13px;
@@ -154,7 +161,7 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
 .nav-item:hover { background: #111; color: var(--text); }
 .nav-item.active { background: #141414; color: var(--text); }
 .nav-item.active::before {
-  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--accent);
+  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; background: var(--accent); border-radius: 0 var(--r-pill) var(--r-pill) 0;
 }
 .nav-item .num {
   font-family: var(--font-mono);
@@ -205,7 +212,7 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
 /* ── Stock Bell ── */
 .bell-btn {
   position: relative; width: 32px; height: 32px;
-  border: 1px solid var(--line-2); border-radius: 4px;
+  border: 1px solid var(--line-2); border-radius: var(--r-sm);
   background: transparent; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   color: var(--dim); font-size: 15px; transition: border-color .15s, color .15s, background .15s;
@@ -225,8 +232,8 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
   position: absolute; top: calc(100% + 10px); right: 0;
   width: 300px; max-height: 380px; overflow-y: auto;
   background: #141414; border: 1px solid rgba(245,176,65,.35);
-  border-radius: 6px; z-index: 9999;
-  box-shadow: 0 8px 28px rgba(0,0,0,.7);
+  border-radius: var(--r-md); z-index: 9999;
+  box-shadow: 0 8px 32px rgba(0,0,0,.75);
 }
 .bell-dropdown-head {
   padding: 10px 14px; border-bottom: 1px solid var(--line);
@@ -259,8 +266,9 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 5px 12px;
   border: 1px solid var(--line);
+  border-radius: var(--r-pill);
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.08em;
@@ -274,9 +282,9 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
   overflow: auto;
   padding: 32px 36px;
 }
-.content::-webkit-scrollbar { width: 10px; height: 10px; }
+.content::-webkit-scrollbar { width: 8px; height: 8px; }
 .content::-webkit-scrollbar-track { background: transparent; }
-.content::-webkit-scrollbar-thumb { background: #222; border: 2px solid var(--bg); }
+.content::-webkit-scrollbar-thumb { background: #252525; border: 2px solid var(--bg); border-radius: var(--r-pill); }
 
 /* ============ PAGE HEADER ============ */
 .page-head {
@@ -316,6 +324,8 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
 .panel {
   background: var(--card);
   border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
   position: relative;
 }
 .panel-head {
@@ -336,22 +346,18 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
 .panel-body { padding: 20px; }
 .panel-footer { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
 
-/* crop marks */
+/* crop marks — desactivados con esquinas redondeadas */
 .crop .panel-head::before,
 .crop .panel-head::after,
 .crop::before,
-.crop::after {
-  content: ""; position: absolute; width: 8px; height: 8px; border: 1px solid var(--line-2);
-  pointer-events: none;
-}
-.crop::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
-.crop::after { top: -1px; right: -1px; border-left: 0; border-bottom: 0; }
+.crop::after { display: none; }
 
 /* ============ BUTTONS ============ */
 .btn {
   display: inline-flex; align-items: center; gap: 8px;
-  padding: 10px 14px;
+  padding: 10px 16px;
   border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--text);
   font-family: var(--font-mono);
@@ -362,11 +368,11 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
   transition: all 0.12s ease;
 }
 .btn:hover { border-color: var(--text); background: #191919; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #0A0A0A; font-weight: 700; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; border-radius: var(--r-sm); }
 .btn.primary:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
 .btn.ghost { border-color: transparent; color: var(--muted); }
 .btn.ghost:hover { color: var(--text); background: #151515; border-color: var(--line); }
-.btn.sm { padding: 6px 10px; font-size: 10px; letter-spacing: 0.1em; }
+.btn.sm { padding: 6px 12px; font-size: 10px; letter-spacing: 0.1em; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ============ FORM ============ */
@@ -380,23 +386,28 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
 }
 .field .req { color: var(--accent); }
 .input, .select, .textarea {
-  background: #0B0B0B;
-  border: 1px solid var(--line);
+  background: #0D0D0D;
+  border: 1px solid var(--line-2);
   padding: 12px 14px;
   color: var(--text);
   font-size: 13px;
   outline: none;
-  transition: border-color 0.1s;
+  transition: border-color 0.15s, box-shadow 0.15s;
   width: 100%;
-  border-radius: 0;
+  border-radius: var(--r-sm);
 }
-.input:focus, .select:focus, .textarea:focus { border-color: var(--accent); }
+.input:focus, .select:focus, .textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(230,57,70,.12);
+}
 .input::placeholder { color: var(--dim); }
 .select option, select option { background: #1A1A1A; color: #E0E0E0; }
 
 .segmented {
   display: inline-flex;
   border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  overflow: hidden;
 }
 .segmented button {
   padding: 8px 14px;
@@ -408,7 +419,7 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
   border-right: 1px solid var(--line-2);
 }
 .segmented button:last-child { border-right: 0; }
-.segmented button:hover { color: var(--text); }
+.segmented button:hover { color: var(--text); background: #181818; }
 .segmented button.on { background: var(--text); color: var(--bg); font-weight: 600; }
 
 /* ============ TABLE ============ */
@@ -443,17 +454,18 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 8px;
+  padding: 3px 10px;
   font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 500;
   border: 1px solid var(--line-2);
+  border-radius: var(--r-pill);
   color: var(--muted);
   white-space: nowrap;
 }
-.badge .pip { width: 6px; height: 6px; background: var(--muted); }
+.badge .pip { width: 6px; height: 6px; background: var(--muted); border-radius: 50%; }
 .badge.sin-empezar { color: #888; border-color: #333; }
 .badge.sin-empezar .pip { background: #888; }
 .badge.impresas { color: #E8B547; border-color: #5c4516; }
@@ -486,15 +498,16 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 1px;
-  background: var(--line);
-  border: 1px solid var(--line);
+  gap: 10px;
   margin-bottom: 24px;
 }
 .kpi {
   background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
   padding: 22px 20px 26px;
   position: relative;
+  overflow: hidden;
 }
 .kpi .label {
   font-family: var(--font-mono);
@@ -544,6 +557,8 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
   gap: 0;
   margin-bottom: 24px;
   border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
 }
 .step {
   flex: 1;
@@ -590,6 +605,7 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
   min-height: 4px;
   position: relative;
   transition: background 0.1s;
+  border-radius: var(--r-xs) var(--r-xs) 0 0;
 }
 .bar-col .bar.ghost { background: #242424; }
 .bar-col .bar.ghost + .v { color: var(--dim); }
@@ -2921,7 +2937,7 @@ function OrderModal({ order: o, designs, prendas, onClose, onUpdateEstado, onUpd
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card)', border: '1px solid var(--line-2)', width: '100%', maxWidth: 860, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card)', border: '1px solid var(--line-2)', borderRadius: 18, width: '100%', maxWidth: 860, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* Header */}
         <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 14, background: '#0F0F0F', flexShrink: 0 }}>
@@ -3095,7 +3111,7 @@ function PayMenu({ menu, onPick, onClose }) {
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 98 }} />
-      <div style={{ position: 'fixed', left: menu.x, top: menu.y, zIndex: 99, background: 'var(--card)', border: '1px solid var(--line-2)', minWidth: 240, boxShadow: '0 12px 40px rgba(0,0,0,0.6)' }}>
+      <div style={{ position: 'fixed', left: menu.x, top: menu.y, zIndex: 99, background: 'var(--card)', border: '1px solid var(--line-2)', borderRadius: 12, minWidth: 240, boxShadow: '0 12px 40px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
         <div style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', color: 'var(--muted)', textTransform: 'uppercase', borderBottom: '1px solid var(--line)' }}>
           Cambiar estado de pago
         </div>
@@ -3115,7 +3131,7 @@ function EstadoMenu({ menu, onPick, onClose }) {
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 98 }} />
-      <div style={{ position: 'fixed', left: menu.x, top: menu.y, zIndex: 99, background: 'var(--card)', border: '1px solid var(--line-2)', minWidth: 200, boxShadow: '0 12px 40px rgba(0,0,0,0.6)' }}>
+      <div style={{ position: 'fixed', left: menu.x, top: menu.y, zIndex: 99, background: 'var(--card)', border: '1px solid var(--line-2)', borderRadius: 12, minWidth: 200, boxShadow: '0 12px 40px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
         <div style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', color: 'var(--muted)', textTransform: 'uppercase', borderBottom: '1px solid var(--line)' }}>
           Estado del pedido
         </div>
@@ -4749,11 +4765,11 @@ function LoginScreen({ onAuth }) {
 
         {/* Estado: cargando */}
         {authLoading && (
-          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', padding: '40px 28px' }}>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '40px 28px' }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 20 }}>
               Verificando acceso…
             </div>
-            <div style={{ width: '100%', height: 2, background: '#1A1A1A', overflow: 'hidden' }}>
+            <div style={{ width: '100%', height: 3, background: '#1A1A1A', overflow: 'hidden', borderRadius: 99 }}>
               <div style={{ height: '100%', background: 'var(--accent)', animation: 'loadBar 1.4s ease-in-out infinite' }} />
             </div>
           </div>
@@ -4761,7 +4777,7 @@ function LoginScreen({ onAuth }) {
 
         {/* Estado: error de conexión */}
         {!authLoading && authError && (
-          <div style={{ background: 'var(--card)', border: '1px solid var(--accent)', padding: '32px 28px' }}>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--accent)', borderRadius: 16, padding: '32px 28px' }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--accent)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
               ⚠ Sin conexión con Firebase
             </div>
@@ -4779,7 +4795,7 @@ function LoginScreen({ onAuth }) {
           <div style={{
             animation: shake ? 'shake 0.4s ease' : 'none',
             background: 'var(--card)', border: `1px solid ${error ? 'var(--accent)' : 'var(--line)'}`,
-            padding: '32px 28px',
+            borderRadius: 18, padding: '32px 28px',
           }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 20 }}>
               Ingresa tu PIN de acceso
@@ -4796,8 +4812,10 @@ function LoginScreen({ onAuth }) {
                 width: '100%', textAlign: 'center', fontSize: 32, fontWeight: 700,
                 fontFamily: 'var(--font-mono)', letterSpacing: '0.3em',
                 background: '#0B0B0B', border: `2px solid ${error ? 'var(--accent)' : pin ? 'var(--accent)' : 'var(--line)'}`,
-                color: 'var(--text)', padding: '14px', outline: 'none',
+                borderRadius: 10, color: 'var(--text)', padding: '14px', outline: 'none',
                 boxSizing: 'border-box',
+                boxShadow: pin ? '0 0 0 4px rgba(230,57,70,.1)' : 'none',
+                transition: 'border-color .2s, box-shadow .2s',
               }}
               placeholder="••••"
             />
@@ -4809,7 +4827,7 @@ function LoginScreen({ onAuth }) {
             <button
               onClick={tryLogin}
               className="btn primary"
-              style={{ width: '100%', padding: '14px', marginTop: 20, fontSize: 12, letterSpacing: '0.18em' }}
+              style={{ width: '100%', padding: '14px', marginTop: 20, fontSize: 12, letterSpacing: '0.18em', borderRadius: 10 }}
             >
               ENTRAR AL SISTEMA
             </button>

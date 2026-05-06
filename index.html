@@ -1233,12 +1233,23 @@ const PAY_METHODS = [
 ];
 
 const PAY_CONFIG_DEFAULT = [
-  { id: 'boxful',    label: 'Boxful',           sub: 'Pago contra entrega',  envio: 100, comisionPct: 8  },
-  { id: 'bac',       label: 'Transf. BAC',       sub: 'BAC Credomatic',       envio: 0,   comisionPct: 0  },
-  { id: 'atlantida', label: 'Transf. Atlántida', sub: 'Banco Atlántida',      envio: 0,   comisionPct: 0  },
-  { id: 'ficohsa',   label: 'Transf. Ficohsa',   sub: 'Banco Ficohsa',        envio: 0,   comisionPct: 0  },
-  { id: 'efectivo',  label: 'Efectivo',          sub: 'Entrega en mano',      envio: 0,   comisionPct: 0  },
+  { id: 'boxful',    label: 'Boxful',           sub: 'Pago contra entrega',  envio: 130, envioReal: 100, comisionPct: 4  },
+  { id: 'bac',       label: 'Transf. BAC',       sub: 'BAC Credomatic',       envio: 0,   envioReal: 0,   comisionPct: 0  },
+  { id: 'atlantida', label: 'Transf. Atlántida', sub: 'Banco Atlántida',      envio: 0,   envioReal: 0,   comisionPct: 0  },
+  { id: 'ficohsa',   label: 'Transf. Ficohsa',   sub: 'Banco Ficohsa',        envio: 0,   envioReal: 0,   comisionPct: 0  },
+  { id: 'efectivo',  label: 'Efectivo',          sub: 'Entrega en mano',      envio: 0,   envioReal: 0,   comisionPct: 0  },
 ];
+
+// ── Calcula comisión neta que realmente afecta la ganancia ──
+// Para métodos con envioReal: el excedente (envio − envioReal) amortigua la comisión % primero.
+// Firebase no se toca — solo cambia la visualización.
+function calcComisionNeta(order, payConfig) {
+  const pm = (payConfig || PAY_CONFIG_DEFAULT).find(m => m.id === order.pay);
+  if (!pm || !pm.comisionPct) return order.comision || 0;
+  const bruta    = (order.total || 0) * (pm.comisionPct / 100);
+  const excedente = Math.max(0, (pm.envio || 0) - (pm.envioReal || 0));
+  return Math.max(0, Math.round((bruta - excedente) * 100) / 100);
+}
 
 const CITIES = ['Atlántida','Choluteca','Colón','Comayagua','Copán','Cortés','El Paraíso','Francisco Morazán','Gracias a Dios','Intibucá','Islas de la Bahía','La Paz','Lempira','Ocotepeque','Olancho','Santa Bárbara','Valle','Yoro'];
 
@@ -1426,7 +1437,7 @@ const CHANNEL_BREAKDOWN = [
 
 // expose
 Object.assign(window, {
-  L, SHIRT_COLORS, SIZES, CHANNELS, PAY_METHODS, PAY_CONFIG_DEFAULT, CITIES, CATALOG, CatThumb,
+  L, SHIRT_COLORS, SIZES, CHANNELS, PAY_METHODS, PAY_CONFIG_DEFAULT, CITIES, CATALOG, CatThumb, calcComisionNeta,
   STATUSES, STATUS_LABELS, PAY_STATUS_LABELS, SAMPLE_ORDERS,
   WEEK_SALES, MONTH_HISTORY, TOP_DESIGNS, CHANNEL_BREAKDOWN,
   PRENDAS, PRENDA_TIPOS, DTF_SIZES, DTF_STOCK,
@@ -2349,7 +2360,7 @@ Object.assign(window, { NuevaVenta });
 // Métricas dashboard — datos en tiempo real desde orders
 const MES_LABELS = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
 
-function Metricas({ orders = [], designs = [] }) {
+function Metricas({ orders = [], designs = [], payConfig = PAY_CONFIG_DEFAULT }) {
   const [period, setPeriod] = useState('mes');
   const now = new Date();
   const cy = now.getFullYear(), cm = now.getMonth();
@@ -2387,21 +2398,21 @@ function Metricas({ orders = [], designs = [] }) {
     const hoy = activeOrders.filter(o => o.fecha === todayStr);
     const bruta = hoy.reduce((a,o) => a + o.total, 0);
     const inv   = hoy.reduce((a,o) => a + calcInversion(o), 0);
-    const com   = hoy.reduce((a,o) => a + (o.comision||0), 0);
+    const com   = hoy.reduce((a,o) => a + calcComisionNeta(o, payConfig), 0);
     const cobrado   = hoy.filter(o => !o.payStatus?.endsWith('-pending')).reduce((a,o) => a + o.total, 0);
     const pendiente = hoy.filter(o =>  o.payStatus?.endsWith('-pending')).reduce((a,o) => a + o.total, 0);
     return { pedidos: hoy.length, bruta, ganancia: bruta - inv - com, cobrado, pendiente };
-  }, [orders]);
+  }, [orders, payConfig]);
 
   const kpis = useMemo(() => {
     const bruta       = filteredOrders.reduce((a,o) => a + o.total, 0);
     const recolectado = filteredOrders.filter(o => !o.payStatus?.endsWith('-pending')).reduce((a,o) => a + o.total, 0);
     const inversion   = filteredOrders.reduce((a,o) => a + calcInversion(o), 0);
-    const comisiones  = filteredOrders.reduce((a,o) => a + (o.comision||0), 0);
+    const comisiones  = filteredOrders.reduce((a,o) => a + calcComisionNeta(o, payConfig), 0);
     const ganancia    = bruta - inversion - comisiones;
     const margen      = bruta > 0 ? (ganancia/bruta)*100 : 0;
     return { bruta, recolectado, inversion, comisiones, ganancia, margen };
-  }, [filteredOrders]);
+  }, [filteredOrders, payConfig]);
 
   const weekData = useMemo(() => {
     const monthOrders = activeOrders.filter(o => { const d=new Date(o.fecha); return d.getFullYear()===cy && d.getMonth()===cm; });
@@ -2446,14 +2457,14 @@ function Metricas({ orders = [], designs = [] }) {
       map[key].bruta+=o.total;
       if (!o.payStatus?.endsWith('-pending')) map[key].recolectada+=o.total;
       map[key].inversion+=calcInversion(o);
-      map[key].comisiones+=(o.comision||0);
+      map[key].comisiones+=calcComisionNeta(o, payConfig);
     });
     const curKey=`${MES_LABELS[cm]} ${String(cy).slice(2)}`;
     return Object.values(map)
       .sort((a,b)=>a.year!==b.year?a.year-b.year:a.month-b.month)
       .slice(-6)
       .map(m=>({...m,ganancia:m.bruta-m.inversion-m.comisiones,margen:m.bruta>0?((m.bruta-m.inversion-m.comisiones)/m.bruta)*100:0,current:m.mes===curKey}));
-  }, [orders]);
+  }, [orders, payConfig]);
 
   const maxWeek = Math.max(...weekData.map(w=>w.v), 1);
   const periodLabel = period==='hoy'?'HOY':period==='mes'?`${MES_LABELS[cm]} ${String(cy).slice(2)}`:period==='trim'?'TRIMESTRE':'AÑO';
@@ -2625,7 +2636,7 @@ Object.assign(window, { Metricas });
 </script>
 <script type="text/babel">
 // Ventas table
-function Ventas({ orders, onOrderUpdate, onOrderDelete, designs = CATALOG, prendas = PRENDAS }) {
+function Ventas({ orders, onOrderUpdate, onOrderDelete, payConfig = PAY_CONFIG_DEFAULT, designs = CATALOG, prendas = PRENDAS }) {
   const [filters, setFilters] = useState({ estado: 'all', pay: 'all', canal: 'all', fecha: 'all', q: '' });
   const [sort, setSort] = useState({ col: 'n', dir: 'desc' }); // columna activa y dirección
   const [modalOrder, setModalOrder] = useState(null);
@@ -2703,10 +2714,11 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete, designs = CATALOG, prend
   const recolectado      = filtered.filter(o => !o.payStatus.endsWith('-pending') && !['rebotado','perdido','sin-empezar'].includes(o.estado)).reduce((a, o) => a + o.total, 0);
   const pendienteBoxful  = filtered.filter(o => (o.payStatus === 'boxful-pending' || o.payStatus.endsWith('-pending')) && !['rebotado','perdido'].includes(o.estado)).reduce((a, o) => a + o.total, 0);
 
-  // Ganancia por fila — usa costos guardados en la orden (igual que Métricas)
+  // Ganancia por fila — usa comisión neta (excedente envío amortigua % COD)
   const rowGanancia = (o) => {
-    const inv = (o.items || []).reduce((a, i) => a + ((i.shirtCost || 0) + (i.dtfCost || 0)) * (i.q || 1), 0);
-    return o.total - inv - (o.comision || 0);
+    const inv     = (o.items || []).reduce((a, i) => a + ((i.shirtCost || 0) + (i.dtfCost || 0)) * (i.q || 1), 0);
+    const comNeta = calcComisionNeta(o, payConfig);
+    return o.total - inv - comNeta;
   };
 
   const sortedFiltered = [...filtered].sort((a, b) => {
@@ -2831,7 +2843,7 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete, designs = CATALOG, prend
                       </div>
                     </td>
                     <td className="num">{L(o.total)}</td>
-                    <td className="num dim">{o.comision ? '−' + L(o.comision) : '—'}</td>
+                    <td className="num dim">{(() => { const c = calcComisionNeta(o, payConfig); return c > 0 ? '−' + L(c) : '—'; })()}</td>
                     <td className="num" style={{ color: 'var(--ok)', fontWeight: 600 }}>{L(ganancia)}</td>
                     <td onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setEstadoMenu(null); setPayMenu({ orderN: o.n, pay: o.pay, x: r.left, y: r.bottom + 4 }); }}>
                       <span style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -2885,6 +2897,7 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete, designs = CATALOG, prend
             order={o}
             designs={designs}
             prendas={prendas}
+            payConfig={payConfig}
             onClose={() => setModalOrder(null)}
             onUpdateEstado={(s) => updateEstado(o.n, s)}
             onUpdatePay={(s) => { onOrderUpdate(o.n, { payStatus: s }); }}
@@ -2896,9 +2909,10 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete, designs = CATALOG, prend
   );
 }
 
-function OrderModal({ order: o, designs, prendas, onClose, onUpdateEstado, onUpdatePay, onDelete }) {
-  const inversion = (o.items || []).reduce((a, i) => a + ((i.shirtCost || 0) + (i.dtfCost || 0)) * (i.q || 1), 0);
-  const ganancia = o.total - inversion - (o.comision || 0);
+function OrderModal({ order: o, designs, prendas, payConfig = PAY_CONFIG_DEFAULT, onClose, onUpdateEstado, onUpdatePay, onDelete }) {
+  const inversion  = (o.items || []).reduce((a, i) => a + ((i.shirtCost || 0) + (i.dtfCost || 0)) * (i.q || 1), 0);
+  const comNeta    = calcComisionNeta(o, payConfig);
+  const ganancia   = o.total - inversion - comNeta;
   const [zoomedImg, setZoomedImg] = useState(null); // { src, name }
 
   useEffect(() => {
@@ -3087,7 +3101,7 @@ function OrderModal({ order: o, designs, prendas, onClose, onUpdateEstado, onUpd
                 {[
                   ['Venta', L(o.total), 'var(--text)'],
                   ['Inversión', '−' + L(inversion), 'var(--warn)'],
-                  ['Comisión', o.comision ? '−' + L(o.comision) : '—', 'var(--warn)'],
+                  ['Comisión', comNeta > 0 ? '−' + L(comNeta) : '—', comNeta > 0 ? 'var(--warn)' : 'var(--dim)'],
                 ].map(([k, v, col]) => (
                   <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
                     <span className="mono" style={{ fontSize: 10, color: 'var(--muted)' }}>{k}</span>
@@ -4588,18 +4602,18 @@ function Configuracion({ payConfig, setPayConfig, stockThreshold = 3, setStockTh
   const [editing, setEditing] = useState(null); // id being edited
   const [form, setForm] = useState({});
   const [showNew, setShowNew] = useState(false);
-  const [newForm, setNewForm] = useState({ label: '', sub: '', envio: 0, comisionPct: 0 });
+  const [newForm, setNewForm] = useState({ label: '', sub: '', envio: 0, envioReal: 0, comisionPct: 0 });
   const [error, setError] = useState('');
 
   const startEdit = (m) => {
     setEditing(m.id);
-    setForm({ label: m.label, sub: m.sub, envio: m.envio, comisionPct: m.comisionPct });
+    setForm({ label: m.label, sub: m.sub, envio: m.envio, envioReal: m.envioReal || 0, comisionPct: m.comisionPct });
     setShowNew(false);
   };
 
   const saveEdit = () => {
     setPayConfig(prev => prev.map(m => m.id === editing
-      ? { ...m, label: form.label, sub: form.sub, envio: Number(form.envio) || 0, comisionPct: Number(form.comisionPct) || 0 }
+      ? { ...m, label: form.label, sub: form.sub, envio: Number(form.envio) || 0, envioReal: Number(form.envioReal) || 0, comisionPct: Number(form.comisionPct) || 0 }
       : m
     ));
     setEditing(null);
@@ -4615,7 +4629,7 @@ function Configuracion({ payConfig, setPayConfig, stockThreshold = 3, setStockTh
     if (!newForm.label.trim()) { setError('El nombre es obligatorio.'); return; }
     const id = newForm.label.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     if (payConfig.find(m => m.id === id)) { setError('Ya existe un método con ese nombre.'); return; }
-    setPayConfig(prev => [...prev, { id, label: newForm.label.trim(), sub: newForm.sub.trim(), envio: Number(newForm.envio) || 0, comisionPct: Number(newForm.comisionPct) || 0 }]);
+    setPayConfig(prev => [...prev, { id, label: newForm.label.trim(), sub: newForm.sub.trim(), envio: Number(newForm.envio) || 0, envioReal: Number(newForm.envioReal) || 0, comisionPct: Number(newForm.comisionPct) || 0 }]);
     setNewForm({ label: '', sub: '', envio: 0, comisionPct: 0 });
     setShowNew(false);
     setError('');
@@ -4643,8 +4657,8 @@ function Configuracion({ payConfig, setPayConfig, stockThreshold = 3, setStockTh
         </div>
 
         {/* Table header */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 110px 110px 80px', gap: 0, borderBottom: '1px solid var(--line)', background: '#0C0C0C' }}>
-          {['Nombre', 'Descripción', 'Envío (L)', 'Comisión %', ''].map((h, i) => (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 100px 100px 110px 80px', gap: 0, borderBottom: '1px solid var(--line)', background: '#0C0C0C' }}>
+          {['Nombre', 'Descripción', 'Cobro envío', 'Valor real', 'Comisión %', ''].map((h, i) => (
             <div key={i} style={{ padding: '9px 16px', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>{h}</div>
           ))}
         </div>
@@ -4652,7 +4666,7 @@ function Configuracion({ payConfig, setPayConfig, stockThreshold = 3, setStockTh
         {payConfig.map(m => (
           <div key={m.id}>
             {editing === m.id ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 110px 110px 80px', gap: 0, borderBottom: '1px solid var(--line)', background: '#141414', alignItems: 'center' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 100px 100px 110px 80px', gap: 0, borderBottom: '1px solid var(--line)', background: '#141414', alignItems: 'center' }}>
                 <div style={{ padding: '10px 16px' }}>
                   <input style={fieldStyle} value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="Nombre" />
                 </div>
@@ -4663,6 +4677,9 @@ function Configuracion({ payConfig, setPayConfig, stockThreshold = 3, setStockTh
                   <input style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }} type="number" min="0" value={form.envio} onChange={e => setForm(f => ({ ...f, envio: e.target.value }))} />
                 </div>
                 <div style={{ padding: '10px 16px' }}>
+                  <input style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }} type="number" min="0" value={form.envioReal} onChange={e => setForm(f => ({ ...f, envioReal: e.target.value }))} />
+                </div>
+                <div style={{ padding: '10px 16px' }}>
                   <input style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }} type="number" min="0" max="100" step="0.5" value={form.comisionPct} onChange={e => setForm(f => ({ ...f, comisionPct: e.target.value }))} />
                 </div>
                 <div style={{ padding: '10px 12px', display: 'flex', gap: 6 }}>
@@ -4671,7 +4688,7 @@ function Configuracion({ payConfig, setPayConfig, stockThreshold = 3, setStockTh
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 110px 110px 80px', gap: 0, borderBottom: '1px solid var(--line)', alignItems: 'center' }}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 100px 100px 110px 80px', gap: 0, borderBottom: '1px solid var(--line)', alignItems: 'center' }}
                 onMouseEnter={e => e.currentTarget.style.background = '#111'}
                 onMouseLeave={e => e.currentTarget.style.background = ''}>
                 <div style={{ padding: '13px 16px' }}>
@@ -4683,7 +4700,19 @@ function Configuracion({ payConfig, setPayConfig, stockThreshold = 3, setStockTh
                   {m.envio > 0 ? <span style={{ color: 'var(--warn)' }}>L {m.envio}</span> : <span style={{ color: 'var(--dim)' }}>—</span>}
                 </div>
                 <div style={{ padding: '13px 16px', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-                  {m.comisionPct > 0 ? <span style={{ color: 'var(--warn)' }}>{m.comisionPct}%</span> : <span style={{ color: 'var(--dim)' }}>—</span>}
+                  {(m.envioReal || 0) > 0 ? <span style={{ color: 'var(--info)' }}>L {m.envioReal}</span> : <span style={{ color: 'var(--dim)' }}>—</span>}
+                </div>
+                <div style={{ padding: '13px 16px', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                  {m.comisionPct > 0 ? (
+                    <span>
+                      <span style={{ color: 'var(--warn)' }}>{m.comisionPct}%</span>
+                      {(m.envioReal || 0) > 0 && (
+                        <span style={{ color: 'var(--dim)', fontSize: 9, marginLeft: 4 }}>
+                          (±L{Math.max(0, (m.envio||0)-(m.envioReal||0))} buf)
+                        </span>
+                      )}
+                    </span>
+                  ) : <span style={{ color: 'var(--dim)' }}>—</span>}
                 </div>
                 <div style={{ padding: '10px 12px', display: 'flex', gap: 6 }}>
                   <button className="btn sm ghost" onClick={() => startEdit(m)}><Icon name="edit" size={11} /></button>
@@ -4700,7 +4729,7 @@ function Configuracion({ payConfig, setPayConfig, stockThreshold = 3, setStockTh
             <div style={{ padding: '14px 16px', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', color: 'var(--accent)', textTransform: 'uppercase' }}>
               + NUEVO MÉTODO DE PAGO
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 110px 110px', gap: 16, padding: '0 16px 16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 100px 100px 110px', gap: 16, padding: '0 16px 16px' }}>
               <div>
                 <label style={labelStyle}>Nombre <span style={{ color: 'var(--accent)' }}>*</span></label>
                 <input style={fieldStyle} placeholder="Ej. Transferencia" value={newForm.label} onChange={e => setNewForm(f => ({ ...f, label: e.target.value }))} />
@@ -4710,8 +4739,12 @@ function Configuracion({ payConfig, setPayConfig, stockThreshold = 3, setStockTh
                 <input style={fieldStyle} placeholder="Ej. Cuenta corriente" value={newForm.sub} onChange={e => setNewForm(f => ({ ...f, sub: e.target.value }))} />
               </div>
               <div>
-                <label style={labelStyle}>Envío (L)</label>
+                <label style={labelStyle}>Cobro envío (L)</label>
                 <input style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }} type="number" min="0" value={newForm.envio} onChange={e => setNewForm(f => ({ ...f, envio: e.target.value }))} />
+              </div>
+              <div>
+                <label style={labelStyle}>Valor real (L)</label>
+                <input style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }} type="number" min="0" value={newForm.envioReal} onChange={e => setNewForm(f => ({ ...f, envioReal: e.target.value }))} />
               </div>
               <div>
                 <label style={labelStyle}>Comisión %</label>
@@ -5623,7 +5656,7 @@ function App({ onLogout }) {
               stockThreshold={stockThreshold}
               invDirty={invDirty} commitInv={commitInv} cancelInv={cancelInv} invSaving={invSaving}
             />}
-          {route === 'metricas'   && <Metricas orders={orders} designs={designs} />}
+          {route === 'metricas'   && <Metricas orders={orders} designs={designs} payConfig={payConfig} />}
           {route === 'config'     && <Configuracion payConfig={payConfig} setPayConfig={setPayConfig} stockThreshold={stockThreshold} setStockThreshold={setStockThreshold} />}
         </div>
       </div>

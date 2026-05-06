@@ -2899,13 +2899,19 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete, designs = CATALOG, prend
 function OrderModal({ order: o, designs, prendas, onClose, onUpdateEstado, onUpdatePay, onDelete }) {
   const inversion = (o.items || []).reduce((a, i) => a + ((i.shirtCost || 0) + (i.dtfCost || 0)) * (i.q || 1), 0);
   const ganancia = o.total - inversion - (o.comision || 0);
+  const [zoomedImg, setZoomedImg] = useState(null); // { src, name }
 
   useEffect(() => {
-    const h = (e) => { if (e.key === 'Escape') onClose(); };
+    const h = (e) => {
+      if (e.key === 'Escape') {
+        if (zoomedImg) setZoomedImg(null);
+        else onClose();
+      }
+    };
     window.addEventListener('keydown', h);
     document.body.style.overflow = 'hidden';
     return () => { window.removeEventListener('keydown', h); document.body.style.overflow = ''; };
-  }, []);
+  }, [zoomedImg]);
 
   const printReceipt = () => {
     const w = window.open('', '_blank', 'width=480,height=640');
@@ -2964,9 +2970,21 @@ function OrderModal({ order: o, designs, prendas, onClose, onUpdateEstado, onUpd
                   const col = SHIRT_COLORS.find(x => x.id === i.c);
                   const prenda = prendas.find(x => x.id === i.p);
                   return (
-                    <div key={idx} style={{ display: 'flex', gap: 14, padding: '12px 14px', background: '#0B0B0B', border: '1px solid var(--line)', alignItems: 'center' }}>
-                      {/* Thumbnail */}
-                      <div style={{ width: 64, height: 64, flexShrink: 0, background: '#111', border: '1px solid var(--line)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div key={idx} style={{ display: 'flex', gap: 14, padding: '12px 14px', background: '#0B0B0B', border: '1px solid var(--line)', borderRadius: 10, alignItems: 'center' }}>
+                      {/* Thumbnail — clickable if has image */}
+                      <div
+                        onClick={() => design?.thumb && setZoomedImg({ src: design.thumb, name: design.name })}
+                        style={{
+                          width: 64, height: 64, flexShrink: 0, background: '#111',
+                          border: '1px solid var(--line)', borderRadius: 8,
+                          overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: design?.thumb ? 'zoom-in' : 'default',
+                          transition: 'border-color .15s, transform .15s, box-shadow .15s',
+                          ...(design?.thumb ? { ':hover': {} } : {}),
+                        }}
+                        onMouseEnter={e => { if (design?.thumb) { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,.5)'; } }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; }}
+                      >
                         {design?.thumb
                           ? <img src={design.thumb} alt={design.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           : design
@@ -3096,6 +3114,46 @@ function OrderModal({ order: o, designs, prendas, onClose, onUpdateEstado, onUpd
           <button className="btn sm" onClick={onClose}>Cerrar</button>
         </div>
       </div>
+
+      {/* ── Lightbox ── */}
+      {zoomedImg && (
+        <div
+          onClick={() => setZoomedImg(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 2000,
+            background: 'rgba(0,0,0,0.92)',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            padding: 24, cursor: 'zoom-out',
+          }}
+        >
+          <img
+            src={zoomedImg.src}
+            alt={zoomedImg.name}
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '88vw', maxHeight: '80vh',
+              objectFit: 'contain',
+              borderRadius: 14,
+              boxShadow: '0 24px 80px rgba(0,0,0,0.8)',
+              cursor: 'default',
+              animation: 'lbIn .18s cubic-bezier(.2,0,.1,1)',
+            }}
+          />
+          <div style={{
+            marginTop: 18,
+            fontFamily: 'var(--font-display)', fontWeight: 800,
+            fontSize: 15, letterSpacing: '-0.01em', color: '#fff',
+            opacity: 0.85,
+          }}>{zoomedImg.name}</div>
+          <div style={{
+            marginTop: 6,
+            fontFamily: 'var(--font-mono)', fontSize: 10,
+            color: 'rgba(255,255,255,0.35)', letterSpacing: '0.1em',
+          }}>CLICK O ESC PARA CERRAR</div>
+        </div>
+      )}
+      <style>{`@keyframes lbIn { from { opacity:0; transform:scale(.88); } to { opacity:1; transform:scale(1); } }`}</style>
     </div>
   );
 }

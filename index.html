@@ -3435,8 +3435,6 @@ function PrendasStockTab({ prendas, setPrendas, stock, addStock, setStockVal, st
   const [newCatId, setNewCatId] = useState('');
   const [newCatName, setNewCatName] = useState('');
   const [newCatSizes, setNewCatSizes] = useState(['S','M','L','XL']);
-  const [searchQ, setSearchQ] = useState('');
-
   const startEditName = (p) => {
     setEditing(p.id);
     setEditName(prev => ({ ...prev, [p.id]: p.name }));
@@ -3485,30 +3483,12 @@ function PrendasStockTab({ prendas, setPrendas, stock, addStock, setStockVal, st
     ));
   };
 
-  const displayPrendas = searchQ.trim()
-    ? prendas.filter(p =>
-        p.name.toLowerCase().includes(searchQ.toLowerCase()) ||
-        p.id.toLowerCase().includes(searchQ.toLowerCase()) ||
-        p.colors.some(c => c.name.toLowerCase().includes(searchQ.toLowerCase()))
-      )
-    : prendas;
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
-      {/* Buscador + Nueva categoría */}
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: -8 }}>
-        <div style={{ flex: 1, position: 'relative' }}>
-          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--dim)', fontSize: 13, pointerEvents: 'none' }}>⌕</span>
-          <input
-            type="text"
-            placeholder="Buscar prenda o color…"
-            value={searchQ}
-            onChange={e => setSearchQ(e.target.value)}
-            style={{ width: '100%', background: '#0B0B0B', border: '1px solid var(--line)', color: 'var(--text)', padding: '10px 12px 10px 34px', fontFamily: 'var(--font-body)', fontSize: 13, outline: 'none' }}
-          />
-        </div>
-        <button className="btn primary" style={{ padding: '12px 18px', fontSize: 12, flexShrink: 0 }} onClick={() => setShowNewCat(s => !s)}>
+      {/* Nueva categoría */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button className="btn primary" style={{ padding: '12px 18px', fontSize: 12 }} onClick={() => setShowNewCat(s => !s)}>
           <Icon name="plus" size={13} /> Nueva categoría
         </button>
       </div>
@@ -3553,12 +3533,7 @@ function PrendasStockTab({ prendas, setPrendas, stock, addStock, setStockVal, st
         </div>
       )}
 
-      {searchQ.trim() && displayPrendas.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--dim)', fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.1em' }}>
-          Sin resultados para "{searchQ}"
-        </div>
-      )}
-      {displayPrendas.map(p => {
+      {prendas.map(p => {
         const totalForProduct = p.colors.reduce((a, c) => {
           const uid = c.uid || c.id;
           return a + p.sizes.reduce((b, sz) => b + (stock[makeStockKey(p.id, uid, sz)] || 0), 0);

@@ -3961,6 +3961,7 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
   const [editingDesign, setEditingDesign] = useState(null);
   const [editMeta, setEditMeta] = useState({});
   const [uploadingId, setUploadingId] = useState(null); // design ID being uploaded
+  const [designSearch, setDesignSearch] = useState('');
 
   const getQty = (designId, size) => dtfStock.find(s => s.design === designId && s.size === size)?.qty || 0;
 
@@ -4050,6 +4051,15 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
 
   const totalUds = dtfStock.reduce((a, s) => a + s.qty, 0);
 
+  const dq = designSearch.toLowerCase().trim();
+  const filteredDesigns = dq
+    ? designs.filter(d =>
+        d.id.toLowerCase().includes(dq) ||
+        (d.name || '').toLowerCase().includes(dq) ||
+        (d.tag  || '').toLowerCase().includes(dq)
+      )
+    : designs;
+
   return (
     <div>
       {/* Summary strip */}
@@ -4064,6 +4074,28 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
         <button className="btn primary" style={{ padding: '14px 20px', fontSize: 12 }} onClick={() => setShowNew(true)}>
           <Icon name="plus" size={13} /> Registrar diseño nuevo
         </button>
+      </div>
+
+      {/* Search bar */}
+      <div className="filterbar" style={{ marginBottom: 20 }}>
+        <div className="filter-group" style={{ flex: 1, maxWidth: 380 }}>
+          <Icon name="search" size={13} />
+          <input
+            style={{ background: 'transparent', border: 0, color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 12, outline: 'none', flex: 1 }}
+            placeholder="Buscar por SKU, nombre o categoría…"
+            value={designSearch}
+            onChange={e => setDesignSearch(e.target.value)}
+          />
+          {designSearch && (
+            <button onClick={() => setDesignSearch('')} title="Limpiar"
+              style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: '0 2px', fontSize: 14, lineHeight: 1 }}>
+              ✕
+            </button>
+          )}
+        </div>
+        <span className="chip" style={{ marginLeft: 'auto' }}>
+          {designSearch ? `${filteredDesigns.length} de ${designs.length}` : `TOTAL  ${designs.length}`}
+        </span>
       </div>
 
       {/* Size manager */}
@@ -4098,8 +4130,13 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
       )}
 
       {/* Design cards grid */}
+      {filteredDesigns.length === 0 && (
+        <div className="mono" style={{ textAlign: 'center', padding: '40px 0', color: 'var(--dim)', fontSize: 12, letterSpacing: '0.08em' }}>
+          {designSearch ? `Sin resultados para "${designSearch}"` : 'No hay diseños registrados'}
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-        {designs.map(d => {
+        {filteredDesigns.map(d => {
           const designTotal = dtfSizes.reduce((a, sz) => a + getQty(d.id, sz), 0);
           const isEditing = editingDesign === d.id;
           const isAgotado = designTotal === 0;
@@ -4398,10 +4435,14 @@ function Clientes({ clients, setClients, orders }) {
   const [viewing, setViewing] = useState(null);     // phone cuyo historial se muestra
   const [search, setSearch] = useState('');
 
+  const q = search.toLowerCase().trim();
   const filtered = clients.filter(c =>
-    !search ||
-    c.phone.toLowerCase().includes(search.toLowerCase()) ||
-    c.nombre.toLowerCase().includes(search.toLowerCase())
+    !q ||
+    (c.phone  || '').toLowerCase().includes(q) ||
+    (c.nombre || '').toLowerCase().includes(q) ||
+    (c.ciudad || '').toLowerCase().includes(q) ||
+    (c.canal  || '').toLowerCase().includes(q) ||
+    (c.notas  || '').toLowerCase().includes(q)
   );
 
   const ordersByPhone = useMemo(() => {
@@ -4440,11 +4481,26 @@ function Clientes({ clients, setClients, orders }) {
       </div>
 
       <div className="filterbar">
-        <div className="filter-group" style={{ flex: 1, maxWidth: 360 }}>
+        <div className="filter-group" style={{ flex: 1, maxWidth: 400 }}>
           <Icon name="search" size={13} />
-          <input style={{ background: 'transparent', border: 0, color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 12, outline: 'none', flex: 1 }} placeholder="Teléfono o nombre…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input
+            style={{ background: 'transparent', border: 0, color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 12, outline: 'none', flex: 1 }}
+            placeholder="Buscar por teléfono, nombre, departamento, canal…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              title="Limpiar búsqueda"
+              style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: '0 2px', fontSize: 14, lineHeight: 1 }}>
+              ✕
+            </button>
+          )}
         </div>
-        <span className="chip" style={{ marginLeft: 'auto' }}>TOTAL <span className="v mono">{filtered.length}</span></span>
+        <span className="chip" style={{ marginLeft: 'auto' }}>
+          {search ? `${filtered.length} de ${clients.length}` : `TOTAL  ${clients.length}`}
+        </span>
       </div>
 
       {editing && (
@@ -4472,6 +4528,13 @@ function Clientes({ clients, setClients, orders }) {
             </tr>
           </thead>
           <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={9} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--dim)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                  {search ? `Sin resultados para "${search}"` : 'No hay clientes registrados'}
+                </td>
+              </tr>
+            )}
             {filtered.map(c => {
               const stats = ordersByPhone[c.phone] || { count: 0, total: 0, last: c.creado };
               const isViewing = viewing === c.phone;
@@ -5067,7 +5130,25 @@ function App({ onLogout }) {
   const [invDirty, setInvDirty] = useS(false);
   const invDirtyRef = React.useRef(false);
   invDirtyRef.current = invDirty;
-  const markInvDirty = () => { if (!invDirtyRef.current) setInvDirty(true); };
+  // Snapshot captured synchronously at the moment of the FIRST manual edit.
+  // invSnap.current still holds the previous render's values at this point
+  // (React batches state updates — the render hasn't happened yet), so this
+  // gives us a clean pre-edit restore point without any Firebase roundtrip.
+  const preEditSnap = React.useRef(null);
+  const markInvDirty = () => {
+    if (!invDirtyRef.current) {
+      // Deep-copy primitives; arrays/objects cloned shallowly — enough for restore
+      preEditSnap.current = {
+        prendas:     invSnap.current.prendas,
+        stock:       { ...invSnap.current.stock },
+        designs:     invSnap.current.designs,
+        dtfSizes:    invSnap.current.dtfSizes,
+        dtfStock:    invSnap.current.dtfStock,
+        stockMovLog: invSnap.current.stockMovLog,
+      };
+      setInvDirty(true);
+    }
+  };
   // Stock movement log helper — prepends entry, caps at 150
   const addMovLog = (type, orderN, key, delta, label) => {
     setStockMovLog(prev => [
@@ -5201,20 +5282,21 @@ function App({ onLogout }) {
       });
   };
   const cancelInv = () => {
-    if (!invReadyRef.current) return;
     if (invTimer.current) { clearTimeout(invTimer.current); invTimer.current = null; }
+    const snap = preEditSnap.current;
+    if (snap) {
+      // Restore synchronously from the local snapshot taken before the first edit.
+      // This is instant and avoids async Firebase race conditions.
+      setPrendas(snap.prendas);
+      setStock(snap.stock);
+      setDesigns(snap.designs);
+      setDtfSizes(snap.dtfSizes);
+      setDtfStock(snap.dtfStock);
+      setStockMovLog(snap.stockMovLog);
+      preEditSnap.current = null;
+    }
     setInvDirty(false);
-    window.db.collection('data').doc('inventory').get().then(invDoc => {
-      if (!invDoc.exists) return;
-      const d = invDoc.data();
-      if (d.prendas?.length)  setPrendas(d.prendas);
-      if (d.stock)            setStock(d.stock);
-      if (d.designs?.length) { const merged = mergeLocalThumbs(d.designs); setDesigns(merged); loadCloudThumbs(merged); }
-      if (d.dtfSizes?.length) setDtfSizes(d.dtfSizes);
-      if (d.dtfStock?.length) setDtfStock(d.dtfStock);
-      if (d.stockMovLog?.length) setStockMovLog(d.stockMovLog);
-      showToast('Cambios descartados', 'info');
-    }).catch(e => console.warn('Inv cancel:', e));
+    showToast('Cambios descartados', 'info');
   };
 
   // Flush pending saves when the tab is closed/hidden — prevents data loss on quick exit

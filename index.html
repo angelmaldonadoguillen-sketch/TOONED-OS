@@ -5072,6 +5072,7 @@ function App({ onLogout }) {
   const [gSearch, setGSearch] = useS('');
   const [gSearchOpen, setGSearchOpen] = useS(false);
   const [fbReady, setFbReady] = useS(false);
+  const [fbError, setFbError] = useS(null); // null = no error, string = error message
   const saveTimers = React.useRef({});
   // PWA install prompt
   const [pwaPrompt, setPwaPrompt] = useS(null);
@@ -5321,13 +5322,21 @@ function App({ onLogout }) {
   };
 
   // ── Firebase: cargar datos al iniciar ──
-  useE(() => {
+  const loadFromFirebase = React.useCallback(() => {
+    setFbError(null);
     const col = window.db.collection('data');
-    Promise.all([
-      col.doc('orders').get(),
-      col.doc('clients').get(),
-      col.doc('config').get(),
-      col.doc('inventory').get(),
+    // Timeout de 12 segundos — si Firebase no responde, muestra error accionable
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Tiempo de espera agotado (12 s) — revisá tu conexión a internet')), 12000)
+    );
+    Promise.race([
+      Promise.all([
+        col.doc('orders').get(),
+        col.doc('clients').get(),
+        col.doc('config').get(),
+        col.doc('inventory').get(),
+      ]),
+      timeout,
     ]).then(([oDoc, cDoc, cfDoc, invDoc]) => {
       if (oDoc.exists && oDoc.data().items?.length) setOrders(oDoc.data().items);
       if (cDoc.exists && cDoc.data().items?.length) setClients(cDoc.data().items);
@@ -5345,8 +5354,21 @@ function App({ onLogout }) {
         if (d.dtfStock?.length) setDtfStock(d.dtfStock);
         if (d.stockMovLog?.length) setStockMovLog(d.stockMovLog);
       }
-    }).catch(e => console.warn('Firebase load:', e)).finally(() => { setFbReady(true); invReadyRef.current = true; });
+      setFbReady(true);
+      invReadyRef.current = true;
+    }).catch(e => {
+      console.error('Firebase load error:', e);
+      // Traducir códigos de error comunes a mensajes claros
+      let msg = e.message || 'Error desconocido';
+      if (e.code === 'permission-denied')  msg = 'Acceso denegado — revisá las reglas de Firestore en Firebase Console';
+      if (e.code === 'unavailable')        msg = 'Firebase no disponible — sin conexión a internet';
+      if (e.code === 'resource-exhausted') msg = 'Cuota de Firebase agotada — revisá el plan en Firebase Console';
+      if (e.code === 'unauthenticated')    msg = 'No autenticado — revisá las reglas de Firestore';
+      setFbError(msg);
+    });
   }, []);
+
+  useE(() => { loadFromFirebase(); }, []);
 
   // ── Firebase: guardar con debounce al cambiar datos ──
   const fbSave = (key, data) => {
@@ -5545,12 +5567,45 @@ function App({ onLogout }) {
   const currentModule = modules.find(m => m.id === route);
 
   if (!fbReady) return (
-    <div style={{ position: 'fixed', inset: 0, background: '#0A0A0A', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, zIndex: 9999 }}>
+    <div style={{ position: 'fixed', inset: 0, background: '#0A0A0A', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, zIndex: 9999, padding: 32 }}>
       <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 36, letterSpacing: '-0.02em' }}>TOONED<span style={{ color: 'var(--accent)' }}>.</span></div>
-      <div className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>Conectando con Firebase…</div>
-      <div style={{ width: 180, height: 2, background: '#1A1A1A', overflow: 'hidden' }}>
-        <div style={{ height: '100%', background: 'var(--accent)', animation: 'loadBar 1.4s ease-in-out infinite' }} />
-      </div>
+
+      {fbError ? (
+        /* ── Error state ── */
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#1A0808', border: '1px solid var(--accent)', padding: '14px 20px', maxWidth: 440, width: '100%' }}>
+            <span style={{ color: 'var(--accent)', fontSize: 18, flexShrink: 0 }}>✕</span>
+            <div>
+              <div className="mono" style={{ fontSize: 11, color: 'var(--accent)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>Error de conexión Firebase</div>
+              <div className="mono" style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>{fbError}</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={loadFromFirebase}
+              style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 12, letterSpacing: '0.1em', padding: '12px 24px', background: 'var(--accent)', color: '#0A0A0A', border: 'none', cursor: 'pointer' }}>
+              ↺ REINTENTAR
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 12, letterSpacing: '0.1em', padding: '12px 24px', background: 'transparent', color: 'var(--muted)', border: '1px solid var(--line)', cursor: 'pointer' }}>
+              RECARGAR PÁGINA
+            </button>
+          </div>
+          <div className="mono" style={{ fontSize: 10, color: 'var(--dim)', textAlign: 'center', maxWidth: 380, lineHeight: 1.6 }}>
+            Si el error persiste: revisá Firebase Console → Firestore → Reglas, o verificá tu conexión a internet.
+          </div>
+        </>
+      ) : (
+        /* ── Loading state ── */
+        <>
+          <div className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>Conectando con Firebase…</div>
+          <div style={{ width: 180, height: 2, background: '#1A1A1A', overflow: 'hidden' }}>
+            <div style={{ height: '100%', background: 'var(--accent)', animation: 'loadBar 1.4s ease-in-out infinite' }} />
+          </div>
+        </>
+      )}
+
       <style>{`@keyframes loadBar { 0%{width:0%;margin-left:0} 50%{width:60%;margin-left:20%} 100%{width:0%;margin-left:100%} }`}</style>
     </div>
   );

@@ -4051,14 +4051,19 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
           <button
             className="btn sm"
             disabled={reloadingThumbs}
-            title="Volver a cargar imágenes desde Firebase"
+            title="Volver a cargar imágenes desde Firebase y guardarlas"
             onClick={() => {
               setReloadingThumbs(true);
-              // Use all designs so even ones that somehow lost their thumb get re-fetched
+              // Force-refetch all thumbs from the thumbs/{id} collection
               loadCloudThumbs(designs.map(d => ({ ...d, thumb: null })));
-              setTimeout(() => setReloadingThumbs(false), 4000);
+              // After fetches + React re-renders complete, save inventory so
+              // thumbs are persisted inline and survive page reloads
+              setTimeout(() => {
+                saveInvNow && saveInvNow();
+                setReloadingThumbs(false);
+              }, 5000);
             }}>
-            {reloadingThumbs ? '⟳ Cargando…' : '⟳ Recargar imágenes'}
+            {reloadingThumbs ? '⟳ Cargando y guardando…' : '⟳ Recargar imágenes'}
           </button>
         )}
         <button className="btn primary" style={{ padding: '14px 20px', fontSize: 12 }} onClick={() => setShowNew(true)}>

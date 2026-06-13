@@ -3327,7 +3327,7 @@ function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStoc
 
 
       {tab === 'prendas' && <PrendasStockTab prendas={prendas} setPrendas={setPrendas} stock={stock} addStock={addStock} setStockVal={setStockVal} stockThreshold={stockThreshold} />}
-      {tab === 'disenos' && <DisenosTab dtfSizes={dtfSizes} setDtfSizes={setDtfSizes} dtfStock={dtfStock} setDtfStock={setDtfStock} designs={designs} setDesigns={setDesigns} designCats={designCats} setDesignCats={setDesignCats} setOrders={setOrders} saveInvNow={saveInvNow} />}
+      {tab === 'disenos' && <DisenosTab dtfSizes={dtfSizes} setDtfSizes={setDtfSizes} dtfStock={dtfStock} setDtfStock={setDtfStock} designs={designs} setDesigns={setDesigns} designCats={designCats} setDesignCats={setDesignCats} setOrders={setOrders} saveInvNow={saveInvNow} loadCloudThumbs={loadCloudThumbs} />}
       {tab === 'movimientos' && <MovimientosTab log={stockMovLog} />}
     </div>
   );
@@ -3929,7 +3929,7 @@ async function uploadToStorage(file, designId) {
   }
 }
 
-function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow }) {
+function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow, loadCloudThumbs }) {
   const [showNew, setShowNew] = useState(false);
   const [manageSizes, setManageSizes] = useState(false);
   const [newSize, setNewSize] = useState('');
@@ -3937,6 +3937,7 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
   const [editMeta, setEditMeta] = useState({});
   const [uploadingId, setUploadingId] = useState(null); // design ID being uploaded
   const [designSearch, setDesignSearch] = useState('');
+  const [reloadingThumbs, setReloadingThumbs] = useState(false);
 
   const getQty = (designId, size) => dtfStock.find(s => s.design === designId && s.size === size)?.qty || 0;
 
@@ -4046,6 +4047,33 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
         <button className="btn sm" onClick={() => setManageSizes(m => !m)}>
           <Icon name="sliders" size={11} /> Tamaños DTF
         </button>
+        {loadCloudThumbs && (
+          <button
+            className="btn sm"
+            disabled={reloadingThumbs}
+            title="Volver a cargar imágenes desde Firebase"
+            onClick={() => {
+              setReloadingThumbs(true);
+              // Force-reload ALL thumbs (not just missing ones) by temporarily clearing them
+              const missing = designs.filter(d => !d.thumb);
+              const toRefetch = missing.length > 0 ? missing : designs;
+              let done = 0;
+              toRefetch.forEach(d => {
+                window.db.collection('thumbs').doc(d.id).get()
+                  .then(doc => {
+                    if (doc.exists && doc.data()?.thumb) {
+                      setDesigns(prev => prev.map(x => x.id === d.id ? { ...x, thumb: doc.data().thumb } : x));
+                      try { localStorage.setItem('thumb_' + d.id, doc.data().thumb); } catch(e) {}
+                    }
+                  })
+                  .catch(() => {})
+                  .finally(() => { done++; if (done >= toRefetch.length) setReloadingThumbs(false); });
+              });
+              if (toRefetch.length === 0) setReloadingThumbs(false);
+            }}>
+            {reloadingThumbs ? '⟳ Cargando…' : '⟳ Recargar imágenes'}
+          </button>
+        )}
         <button className="btn primary" style={{ padding: '14px 20px', fontSize: 12 }} onClick={() => setShowNew(true)}>
           <Icon name="plus" size={13} /> Registrar diseño nuevo
         </button>

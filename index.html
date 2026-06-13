@@ -3242,7 +3242,7 @@ function seedStock() {
   return s;
 }
 
-function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStock, setStockVal, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow, stockMovLog = [], stockThreshold = 3, invDirty, commitInv, cancelInv, invSaving }) {
+function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStock, setStockVal, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow, loadCloudThumbs, stockMovLog = [], stockThreshold = 3, invDirty, commitInv, cancelInv, invSaving }) {
   const [tab, setTab] = useState('prendas');
   const [confirmCancel, setConfirmCancel] = useState(false);
 
@@ -5818,6 +5818,7 @@ function App({ onLogout }) {
               designCats={designCats} setDesignCats={setDesignCats}
               setOrders={setOrders}
               saveInvNow={saveInvNow}
+              loadCloudThumbs={loadCloudThumbs}
               stockMovLog={stockMovLog}
               stockThreshold={stockThreshold}
               invDirty={invDirty} commitInv={commitInv} cancelInv={cancelInv} invSaving={invSaving}

@@ -2425,16 +2425,19 @@ function Metricas({ orders = [], designs = [], payConfig = PAY_CONFIG_DEFAULT })
 
   const topDesigns = useMemo(() => {
     const map = {};
-    filteredOrders.forEach(o => o.items.forEach(i => {
-      if (!map[i.d]) {
-        const d = designs.find(x=>x.id===i.d) || CATALOG.find(x=>x.id===i.d);
-        map[i.d] = { id: i.d, name: d?.name||i.d, thumb: d?.thumb||null, qty: 0, revenue: 0 };
-      }
-      const col=SHIRT_COLORS.find(x=>x.id===i.c), des=designs.find(x=>x.id===i.d)||CATALOG.find(x=>x.id===i.d);
-      const price=Math.max(420, Math.ceil(((col?.cost||215)+(des?.cost||85))*1.35/5)*5);
-      map[i.d].qty += i.q;
-      map[i.d].revenue += price*i.q;
-    }));
+    filteredOrders.forEach(o => {
+      // Reparte el total REAL del pedido entre sus ítems, ponderado por cantidad.
+      // Así la suma de ingresos por diseño coincide con la venta real (o.total).
+      const totalQ = (o.items || []).reduce((a, i) => a + (i.q || 1), 0) || 1;
+      o.items.forEach(i => {
+        if (!map[i.d]) {
+          const d = designs.find(x=>x.id===i.d) || CATALOG.find(x=>x.id===i.d);
+          map[i.d] = { id: i.d, name: d?.name||i.d, thumb: d?.thumb||null, qty: 0, revenue: 0 };
+        }
+        map[i.d].qty += i.q;
+        map[i.d].revenue += o.total * ((i.q || 1) / totalQ);
+      });
+    });
     return Object.values(map).sort((a,b)=>b.revenue-a.revenue).slice(0,5);
   }, [filteredOrders, designs]);
 
@@ -2648,14 +2651,14 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete, payConfig = PAY_CONFIG_D
   const exportCSV = () => {
     const rowGan = (o) => {
       const inv = (o.items||[]).reduce((a,i) => a + ((i.shirtCost||0)+(i.dtfCost||0))*(i.q||1), 0);
-      return o.total - inv - (o.comision||0);
+      return o.total - inv - calcComisionNeta(o, payConfig);
     };
     const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const headers = ['Orden','Fecha','Cliente','Teléfono','Departamento','Canal','Dirección','Piezas','Total','Inversión','Comisión','Ganancia','Estado','Pago','Estado Pago','Nota'];
     const rows = sortedFiltered.map(o => {
       const inv = (o.items||[]).reduce((a,i) => a + ((i.shirtCost||0)+(i.dtfCost||0))*(i.q||1), 0);
       const piezasStr = (o.items||[]).map(i => { const d = designs.find(x=>x.id===i.d); return `${d?.name||i.d} T${i.s} ×${i.q}`; }).join(' | ');
-      return [o.n, o.fecha, o.cliente, o.phone||'', o.ciudad, o.canal, o.direccion||'', piezasStr, o.total, inv, o.comision||0, rowGan(o), STATUS_LABELS[o.estado]||o.estado, o.pay, o.payStatus, o.nota||''].map(esc).join(',');
+      return [o.n, o.fecha, o.cliente, o.phone||'', o.ciudad, o.canal, o.direccion||'', piezasStr, o.total, inv, calcComisionNeta(o, payConfig), rowGan(o), STATUS_LABELS[o.estado]||o.estado, o.pay, o.payStatus, o.nota||''].map(esc).join(',');
     });
     const csv = '﻿' + [headers.map(esc).join(','), ...rows].join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -2711,8 +2714,8 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete, payConfig = PAY_CONFIG_D
   });
 
   const totalFiltered    = filtered.reduce((a, o) => a + o.total, 0);
-  const recolectado      = filtered.filter(o => !o.payStatus.endsWith('-pending') && !['rebotado','perdido','sin-empezar'].includes(o.estado)).reduce((a, o) => a + o.total, 0);
-  const pendienteBoxful  = filtered.filter(o => (o.payStatus === 'boxful-pending' || o.payStatus.endsWith('-pending')) && !['rebotado','perdido'].includes(o.estado)).reduce((a, o) => a + o.total, 0);
+  const recolectado      = filtered.filter(o => !o.payStatus?.endsWith('-pending') && !['rebotado','perdido','sin-empezar'].includes(o.estado)).reduce((a, o) => a + o.total, 0);
+  const pendienteBoxful  = filtered.filter(o => (o.payStatus === 'boxful-pending' || o.payStatus?.endsWith('-pending')) && !['rebotado','perdido'].includes(o.estado)).reduce((a, o) => a + o.total, 0);
 
   // Ganancia por fila — usa comisión neta (excedente envío amortigua % COD)
   const rowGanancia = (o) => {
@@ -2881,7 +2884,7 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete, payConfig = PAY_CONFIG_D
             <span className="muted">SUMA TOTAL <span style={{ color: 'var(--text)' }}>{L(totalFiltered)}</span></span>
             <span className="muted">RECOLECTADO <span style={{ color: 'var(--ok)' }}>{L(recolectado)}</span></span>
             <span className="muted">PEND. BOXFUL <span style={{ color: 'var(--warn)' }}>{L(pendienteBoxful)}</span></span>
-            <span className="muted">COMISIONES <span style={{ color: 'var(--text)' }}>−{L(filtered.reduce((a, o) => a + (o.comision || 0), 0))}</span></span>
+            <span className="muted">COMISIONES <span style={{ color: 'var(--text)' }}>−{L(filtered.reduce((a, o) => a + calcComisionNeta(o, payConfig), 0))}</span></span>
           </div>
         </div>
       </div>
@@ -2948,7 +2951,7 @@ function OrderModal({ order: o, designs, prendas, payConfig = PAY_CONFIG_DEFAULT
       <hr/>
       <div class="row"><span class="label">Venta</span><span>L ${o.total.toLocaleString()}</span></div>
       <div class="row"><span class="label">Inversión</span><span>L ${inversion.toLocaleString()}</span></div>
-      ${o.comision ? `<div class="row"><span class="label">Comisión</span><span>-L ${o.comision.toLocaleString()}</span></div>` : ''}
+      ${comNeta > 0 ? `<div class="row"><span class="label">Comisión</span><span>-L ${comNeta.toLocaleString()}</span></div>` : ''}
       <div class="row big"><span>GANANCIA</span><span>L ${ganancia.toLocaleString()}</span></div>
       <div style="margin-top:24px;font-size:10px;color:#999;text-align:center">TOONED HN · Sistema Operativo Interno</div>
     </body></html>`);
@@ -4425,7 +4428,7 @@ Object.assign(window, { Inventario, makeStockKey });
 </script>
 <script type="text/babel">
 // Clientes module
-function Clientes({ clients, setClients, orders }) {
+function Clientes({ clients, setClients, orders, payConfig = PAY_CONFIG_DEFAULT }) {
   const [editing, setEditing] = useState(null);     // phone being edited, or 'new'
   const [viewing, setViewing] = useState(null);     // phone cuyo historial se muestra
   const [search, setSearch] = useState('');
@@ -4564,7 +4567,7 @@ function Clientes({ clients, setClients, orders }) {
                               : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                   {clientOrders.map(o => {
                                     const inv = (o.items||[]).reduce((a,i) => a + ((i.shirtCost||0)+(i.dtfCost||0))*(i.q||1), 0);
-                                    const gan = o.total - inv - (o.comision||0);
+                                    const gan = o.total - inv - calcComisionNeta(o, payConfig);
                                     return (
                                       <div key={o.n} style={{ display: 'grid', gridTemplateColumns: '60px 1fr auto auto auto', gap: 16, alignItems: 'center', padding: '10px 14px', background: 'var(--card)', border: '1px solid var(--line)' }}>
                                         <div className="mono" style={{ fontWeight: 700, fontSize: 13, color: 'var(--accent)' }}>#{o.n}</div>
@@ -4688,7 +4691,7 @@ function Configuracion({ payConfig, setPayConfig, stockThreshold = 3, setStockTh
     const id = newForm.label.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     if (payConfig.find(m => m.id === id)) { setError('Ya existe un método con ese nombre.'); return; }
     setPayConfig(prev => [...prev, { id, label: newForm.label.trim(), sub: newForm.sub.trim(), envio: Number(newForm.envio) || 0, envioReal: Number(newForm.envioReal) || 0, comisionPct: Number(newForm.comisionPct) || 0 }]);
-    setNewForm({ label: '', sub: '', envio: 0, comisionPct: 0 });
+    setNewForm({ label: '', sub: '', envio: 0, envioReal: 0, comisionPct: 0 });
     setShowNew(false);
     setError('');
   };
@@ -5488,12 +5491,12 @@ function App({ onLogout }) {
     const ventaMes = monthOrders.reduce((a, o) => a + (o.total || 0), 0);
     const gananciaMes = monthOrders.reduce((a, o) => {
       const inv = (o.items || []).reduce((s, i) => s + ((i.shirtCost || 0) + (i.dtfCost || 0)) * (i.q || 1), 0);
-      return a + (o.total || 0) - inv - (o.comision || 0);
+      return a + (o.total || 0) - inv - calcComisionNeta(o, payConfig);
     }, 0);
     const stockBajo = Object.values(stock).filter(v => v > 0 && v <= stockThreshold).length;
     const boxfulPend = orders.filter(o => o.payStatus === 'boxful-pending' && !['rebotado','perdido'].includes(o.estado)).length;
     return { mesLabel, ventaMes, gananciaMes, stockBajo, boxfulPend };
-  }, [orders, stock, stockThreshold]);
+  }, [orders, stock, stockThreshold, payConfig]);
 
   const handleOrderCreated = (order) => {
     // Stamp initial estado log
@@ -5800,7 +5803,7 @@ function App({ onLogout }) {
         <div className="content">
           {route === 'nueva'      && <NuevaVenta key={orderKey} onOrderCreated={(o) => handleOrderCreated(o)} onReset={() => { setOrderKey(k => k + 1); setRoute('nueva'); }} nextOrderNumber={nextOrderNumber} clients={clients} payConfig={payConfig} onClientCreated={(c) => setClients(prev => prev.find(x => x.phone === c.phone) ? prev : [c, ...prev])} prendas={prendas} designs={designs} dtfStock={dtfStock} stock={stock} />}
           {route === 'ventas'     && <Ventas orders={orders} onOrderUpdate={handleOrderUpdate} onOrderDelete={handleDeleteOrder} payConfig={payConfig} designs={designs} prendas={prendas} />}
-          {route === 'clientes'   && <Clientes clients={clients} setClients={setClients} orders={orders} />}
+          {route === 'clientes'   && <Clientes clients={clients} setClients={setClients} orders={orders} payConfig={payConfig} />}
           {route === 'inventario' && <Inventario
               prendas={prendas}   setPrendas={(v)   => { setPrendas(v);   markInvDirty(); }}
               dtfSizes={dtfSizes} setDtfSizes={(v)  => { setDtfSizes(v);  markInvDirty(); }}

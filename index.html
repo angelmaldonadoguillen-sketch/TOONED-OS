@@ -4054,22 +4054,9 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
             title="Volver a cargar imágenes desde Firebase"
             onClick={() => {
               setReloadingThumbs(true);
-              // Force-reload ALL thumbs (not just missing ones) by temporarily clearing them
-              const missing = designs.filter(d => !d.thumb);
-              const toRefetch = missing.length > 0 ? missing : designs;
-              let done = 0;
-              toRefetch.forEach(d => {
-                window.db.collection('thumbs').doc(d.id).get()
-                  .then(doc => {
-                    if (doc.exists && doc.data()?.thumb) {
-                      setDesigns(prev => prev.map(x => x.id === d.id ? { ...x, thumb: doc.data().thumb } : x));
-                      try { localStorage.setItem('thumb_' + d.id, doc.data().thumb); } catch(e) {}
-                    }
-                  })
-                  .catch(() => {})
-                  .finally(() => { done++; if (done >= toRefetch.length) setReloadingThumbs(false); });
-              });
-              if (toRefetch.length === 0) setReloadingThumbs(false);
+              // Use all designs so even ones that somehow lost their thumb get re-fetched
+              loadCloudThumbs(designs.map(d => ({ ...d, thumb: null })));
+              setTimeout(() => setReloadingThumbs(false), 4000);
             }}>
             {reloadingThumbs ? '⟳ Cargando…' : '⟳ Recargar imágenes'}
           </button>

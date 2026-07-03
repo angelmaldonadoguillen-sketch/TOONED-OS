@@ -1162,6 +1162,45 @@ const formatTs = (iso) => {
   } catch { return iso.slice(0, 16); }
 };
 
+// ─── Sistema de diálogos interno (reemplaza window.confirm / alert) ───
+// Store con suscripción + promesa. Cualquier componente llama a
+// uiConfirm({...}) o uiAlert({...}) y recibe una promesa que resuelve
+// cuando el usuario elige. El <DialogHost/> (montado una vez en App)
+// escucha el store y renderiza el modal con la estética del sistema.
+const _dialogListeners = new Set();
+let _dialogState = null;
+function _emitDialog(state) {
+  _dialogState = state;
+  _dialogListeners.forEach(fn => fn(state));
+}
+// opts: { title, message, confirmLabel, cancelLabel, danger }
+function uiConfirm(opts = {}) {
+  return new Promise(resolve => {
+    _emitDialog({
+      kind: 'confirm',
+      title: opts.title || '¿Confirmar acción?',
+      message: opts.message || '',
+      confirmLabel: opts.confirmLabel || 'Confirmar',
+      cancelLabel: opts.cancelLabel || 'Cancelar',
+      danger: opts.danger !== false, // por defecto rojo (acción destructiva)
+      resolve,
+    });
+  });
+}
+// opts: { title, message } o simplemente un string
+function uiAlert(opts = {}) {
+  const o = typeof opts === 'string' ? { message: opts } : opts;
+  return new Promise(resolve => {
+    _emitDialog({
+      kind: 'alert',
+      title: o.title || 'Aviso',
+      message: o.message || '',
+      confirmLabel: o.confirmLabel || 'Entendido',
+      resolve,
+    });
+  });
+}
+
 // Prendas — simplified to the 4 personalizable types
 const PRENDAS = [
   {
@@ -2862,7 +2901,7 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete, payConfig = PAY_CONFIG_D
                     <td className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{o.fecha.slice(5)}</td>
                     <td onClick={e => e.stopPropagation()}>
                       <button
-                        onClick={() => onOrderDelete(o.n)}
+                        onClick={() => uiConfirm({ title: `Eliminar pedido #${o.n}`, message: `Cliente: ${o.cliente}\nEl stock de los ítems regresará al inventario.`, confirmLabel: 'Eliminar' }).then(ok => { if (ok) onOrderDelete(o.n); })}
                         title="Eliminar pedido"
                         style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, padding: '2px 8px', border: '1px solid #3D1515', background: 'rgba(0,0,0,0.5)', cursor: 'pointer', opacity: 0.7, lineHeight: 1 }}
                         onMouseEnter={e => e.currentTarget.style.opacity = 1}
@@ -3124,7 +3163,7 @@ function OrderModal({ order: o, designs, prendas, payConfig = PAY_CONFIG_DEFAULT
         <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', display: 'flex', gap: 10, background: '#0F0F0F', flexShrink: 0 }}>
           <button className="btn sm ghost" onClick={printReceipt}><Icon name="dl" size={11} /> Imprimir recibo</button>
           <button className="btn sm ghost" style={{ marginLeft: 'auto', color: 'var(--accent)', borderColor: '#3D1515' }}
-            onClick={() => { if (window.confirm(`¿Eliminar pedido #${o.n}?`)) onDelete(); }}>
+            onClick={() => uiConfirm({ title: `Eliminar pedido #${o.n}`, message: 'El stock de los ítems regresará al inventario.', confirmLabel: 'Eliminar' }).then(ok => { if (ok) onDelete(); })}>
             × Eliminar pedido
           </button>
           <button className="btn sm" onClick={onClose}>Cerrar</button>
@@ -3449,8 +3488,8 @@ function PrendasStockTab({ prendas, setPrendas, stock, addStock, setStockVal, st
   };
 
   const deletePrenda = (id) => {
-    if (!window.confirm('¿Eliminar esta categoría? Se borrará su stock también.')) return;
-    setPrendas(prev => prev.filter(p => p.id !== id));
+    uiConfirm({ title: 'Eliminar categoría', message: 'Se borrará también todo su stock. Esta acción no se puede deshacer.', confirmLabel: 'Eliminar' })
+      .then(ok => { if (ok) setPrendas(prev => prev.filter(p => p.id !== id)); });
   };
 
   const TALLAS_BASE = ['XS','S','M','L','XL','XXL','ÚNICA'];
@@ -3985,8 +4024,8 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
     // Duplicate check — ignore the design being edited itself
     const dupSku  = designs.find(x => x.id === newId && x.id !== oldId);
     const dupName = designs.find(x => x.name.trim().toLowerCase() === newName.toLowerCase() && x.id !== oldId);
-    if (dupSku)  { alert(`El SKU "${newId}" ya lo tiene otro diseño.`); return; }
-    if (dupName) { alert(`Ya existe un diseño llamado "${dupName.name}".`); return; }
+    if (dupSku)  { uiAlert({ title: 'SKU duplicado', message: `El SKU "${newId}" ya lo tiene otro diseño.` }); return; }
+    if (dupName) { uiAlert({ title: 'Nombre duplicado', message: `Ya existe un diseño llamado "${dupName.name}".` }); return; }
     setDesigns(prev => prev.map(d => d.id === oldId ? { ...d, id: newId, name: newName } : d));
     setDtfStock(prev => prev.map(s => s.design === oldId ? { ...s, design: newId } : s));
     if (setOrders) setOrders(prev => prev.map(o => ({
@@ -4021,8 +4060,8 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
     // Double-check duplicates at save time (NewDisenoForm also validates)
     const dupSku  = designs.find(x => x.id === sku);
     const dupName = designs.find(x => x.name.trim().toLowerCase() === name.trim().toLowerCase());
-    if (dupSku)  { alert(`El SKU "${sku}" ya existe en el catálogo.`); return; }
-    if (dupName) { alert(`Ya existe un diseño con el nombre "${dupName.name}".`); return; }
+    if (dupSku)  { uiAlert({ title: 'SKU duplicado', message: `El SKU "${sku}" ya existe en el catálogo.` }); return; }
+    if (dupName) { uiAlert({ title: 'Nombre duplicado', message: `Ya existe un diseño con el nombre "${dupName.name}".` }); return; }
     setDesigns(prev => [...prev, { id: sku, name, tag, thumb: thumb || null }]);
     setShowNew(false);
   };
@@ -4151,7 +4190,7 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
                   </div>
                 )}
                 <button
-                  onClick={() => { if (window.confirm(`¿Eliminar "${d.name}" del catálogo?`)) deleteDesign(d.id); }}
+                  onClick={() => uiConfirm({ title: 'Eliminar diseño', message: `Se quitará "${d.name}" del catálogo junto con su stock DTF.`, confirmLabel: 'Eliminar' }).then(ok => { if (ok) deleteDesign(d.id); })}
                   style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.82)', border: '1px solid #3D1515', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 8px', cursor: 'pointer', letterSpacing: '0.08em', zIndex: 4 }}>
                   × Eliminar
                 </button>
@@ -4458,7 +4497,7 @@ function Clientes({ clients, setClients, orders, payConfig = PAY_CONFIG_DEFAULT 
     if (original) {
       setClients(prev => prev.map(x => x.phone === original ? c : x));
     } else {
-      if (clients.some(x => x.phone === c.phone)) { alert('Ya existe cliente con ese teléfono'); return; }
+      if (clients.some(x => x.phone === c.phone)) { uiAlert({ title: 'Teléfono duplicado', message: 'Ya existe un cliente con ese número de teléfono.' }); return; }
       setClients(prev => [{ ...c, creado: new Date().toISOString().slice(0,10) }, ...prev]);
     }
     setEditing(null);
@@ -5105,6 +5144,66 @@ function StockBell({ alerts = [] }) {
   );
 }
 
+// Modal de confirmación / aviso — escucha el store global de diálogos.
+// Se monta una sola vez dentro de App.
+function DialogHost() {
+  const [state, setState] = useS(null);
+  const close = (result) => { if (state) state.resolve(result); setState(null); };
+  useE(() => {
+    const fn = (s) => setState(s);
+    _dialogListeners.add(fn);
+    return () => _dialogListeners.delete(fn);
+  }, []);
+  useE(() => {
+    if (!state) return;
+    const h = (e) => {
+      if (e.key === 'Escape') close(state.kind === 'confirm' ? false : true);
+      if (e.key === 'Enter')  close(true);
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [state]);
+  if (!state) return null;
+  const accent = state.danger ? 'var(--accent)' : 'var(--ok)';
+  return (
+    <div
+      onClick={() => close(state.kind === 'confirm' ? false : true)}
+      style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, animation: 'dlgFade .15s ease-out' }}>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ background: 'var(--card)', border: `1px solid var(--line-2)`, borderRadius: 16, width: '100%', maxWidth: 400, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.7)', animation: 'dlgIn .18s cubic-bezier(.2,0,.1,1)' }}>
+        <div style={{ padding: '20px 22px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 8, background: state.danger ? 'rgba(230,57,70,.12)' : 'rgba(123,201,111,.12)', color: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>
+              {state.danger ? '⚠' : 'ℹ'}
+            </span>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 17, letterSpacing: '-0.01em' }}>{state.title}</div>
+          </div>
+          {state.message && (
+            <div style={{ color: 'var(--muted)', fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', paddingLeft: 40 }}>{state.message}</div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: '20px 22px 20px' }}>
+          {state.kind === 'confirm' && (
+            <button className="btn sm" onClick={() => close(false)}>{state.cancelLabel}</button>
+          )}
+          <button
+            className="btn sm"
+            autoFocus
+            onClick={() => close(true)}
+            style={{ background: accent, borderColor: accent, color: state.danger ? '#fff' : '#0A0A0A', fontWeight: 700 }}>
+            {state.confirmLabel}
+          </button>
+        </div>
+      </div>
+      <style>{`
+        @keyframes dlgFade { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes dlgIn { from { opacity: 0; transform: scale(.94) translateY(8px) } to { opacity: 1; transform: scale(1) translateY(0) } }
+      `}</style>
+    </div>
+  );
+}
+
 function App({ onLogout }) {
   const logout = () => { sessionStorage.removeItem('tooned-auth'); onLogout(); };
 
@@ -5134,13 +5233,20 @@ function App({ onLogout }) {
   }, []);
 
   // ── Toast / snackbar system ──
-  const [toast, setToast] = useS(null); // { msg, tone: 'ok'|'warn'|'info' }
+  const [toast, setToast] = useS(null); // { msg, tone, action?: { label, fn }, duration }
   const toastTimer = React.useRef(null);
   const showToast = (msg, tone = 'ok') => {
     setToast({ msg, tone });
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 3000);
   };
+  // Toast con botón de acción (ej. Deshacer). Dura más para dar tiempo a reaccionar.
+  const showActionToast = (msg, actionLabel, actionFn, tone = 'info', duration = 6000) => {
+    setToast({ msg, tone, action: { label: actionLabel, fn: actionFn } });
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), duration);
+  };
+  const dismissToast = () => { clearTimeout(toastTimer.current); setToast(null); };
 
   // ── Inventario state (lifted so Ventas can restore stock on delete) ──
   const [prendas, setPrendas] = useS(PRENDAS);
@@ -5575,10 +5681,34 @@ function App({ onLogout }) {
     setOrders(prev => prev.map(o => o.n === n ? { ...o, ...patch, ...estadoPatch } : o));
   };
 
+  // Restaura un pedido borrado por accidente: lo re-agrega y vuelve a
+  // descontar del inventario el stock que la eliminación había devuelto.
+  const restoreDeletedOrder = (order) => {
+    order.items?.forEach(i => {
+      if (i.p && i.c && i.s) {
+        const key = makeStockKey(i.p, i.c, i.s);
+        setStock(prev => ({ ...prev, [key]: Math.max(0, (prev[key] || 0) - (i.q || 1)) }));
+        addMovLog('restaurado', order.n, key, -(i.q || 1), `${i.p} · ${i.c} · T${i.s}`);
+      }
+    });
+    order.items?.forEach(i => {
+      if (i.d && i.d !== '__none__' && i.dtf) {
+        setDtfStock(prev => prev.map(s =>
+          s.design === i.d && s.size === i.dtf ? { ...s, qty: Math.max(0, s.qty - (i.q || 1)) } : s
+        ));
+        addMovLog('restaurado', order.n, `dtf:${i.d}:${i.dtf}`, -(i.q || 1), `DTF ${i.d} · ${i.dtf}`);
+      }
+    });
+    scheduleInvSave();
+    setOrders(prev => prev.some(o => o.n === order.n) ? prev : [order, ...prev].sort((a, b) => b.n - a.n));
+    showToast(`Pedido #${order.n} restaurado`, 'ok');
+  };
+
+  // La confirmación ahora ocurre en el call-site (modal interno).
+  // Esta función ejecuta el borrado y ofrece "Deshacer".
   const handleDeleteOrder = (n) => {
     const order = orders.find(o => o.n === n);
     if (!order) return;
-    if (!window.confirm(`¿Eliminar pedido #${n} de ${order.cliente}?\nEl stock de los items regresará al inventario.`)) return;
     // Restore shirt stock + log
     order.items?.forEach(i => {
       if (i.p && i.c && i.s) {
@@ -5600,7 +5730,7 @@ function App({ onLogout }) {
     });
     scheduleInvSave();
     setOrders(prev => prev.filter(o => o.n !== n));
-    showToast(`Pedido #${n} eliminado · stock restaurado`, 'info');
+    showActionToast(`Pedido #${n} eliminado · stock restaurado`, 'Deshacer', () => restoreDeletedOrder(order));
   };
 
   const modules = [
@@ -5814,6 +5944,9 @@ function App({ onLogout }) {
         </div>
       </div>
 
+      {/* Diálogos internos (confirmar / avisar) */}
+      <DialogHost />
+
       {/* Toast / snackbar */}
       {toast && (
         <div style={{
@@ -5825,9 +5958,17 @@ function App({ onLogout }) {
           fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.04em', fontWeight: 500,
           minWidth: 240, maxWidth: 380,
           boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-          animation: 'toastIn 0.25s ease-out'
+          animation: 'toastIn 0.25s ease-out',
+          display: 'flex', alignItems: 'center', gap: 14, borderRadius: 12,
         }}>
-          {toast.msg}
+          <span style={{ flex: 1 }}>{toast.msg}</span>
+          {toast.action && (
+            <button
+              onClick={() => { toast.action.fn(); dismissToast(); }}
+              style={{ flexShrink: 0, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer' }}>
+              ↺ {toast.action.label}
+            </button>
+          )}
         </div>
       )}
       <style>{`

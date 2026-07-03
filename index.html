@@ -22,6 +22,8 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://unpkg.com" crossorigin />
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Archivo+Narrow:wght@500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -597,8 +599,8 @@ input, select, textarea { font-family: inherit; color: inherit; cursor: text; us
 
 /* ============ CHART ============ */
 .bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 220px; padding: 16px 4px 0; }
-.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.bar-col .bar-wrap { flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: flex-end; }
+.bar-col { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.bar-col .bar-wrap { flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; min-height: 0; }
 .bar-col .bar {
   background: var(--accent);
   width: 100%;
@@ -1136,8 +1138,8 @@ hr.divider { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
 </head>
 <body>
 <div id="root"></div>
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 <script>
 const TWEAK_DEFAULTS = {
@@ -2584,8 +2586,10 @@ function Metricas({ orders = [], designs = [], payConfig = PAY_CONFIG_DEFAULT })
             <div className="bar-chart">
               {weekData.map(w => (
                 <div key={w.wk} className="bar-col">
-                  <div className="v">{w.v>0?(w.v/1000).toFixed(1)+'K':'—'}</div>
-                  <div className="bar-wrap"><div className="bar" style={{ height: `${(w.v/maxWeek)*100}%` }} /></div>
+                  <div className="bar-wrap">
+                    <div className="v">{w.v>0?(w.v/1000).toFixed(1)+'K':'—'}</div>
+                    <div className={`bar${w.v<=0?' ghost':''}`} style={{ height: `${Math.max(2, (w.v/maxWeek)*90)}%` }} />
+                  </div>
                   <div className="lbl">{w.wk}</div>
                 </div>
               ))}

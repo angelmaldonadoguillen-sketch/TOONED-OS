@@ -1203,6 +1203,43 @@ function uiAlert(opts = {}) {
   });
 }
 
+// ─── Gastos: helpers compartidos (módulo Gastos + Métricas) ───
+const GASTO_PLATAFORMAS = ['Instagram', 'Facebook', 'TikTok', 'Google', 'Otro'];
+const GASTO_CATEGORIAS  = ['Suscripción', 'Insumo', 'Servicio', 'Local', 'Otro'];
+// Suma mensual de los gastos fijos activos
+function fixedMonthlyTotal(list) {
+  return (list || []).filter(f => f.activo !== false).reduce((a, f) => a + (Number(f.monto) || 0), 0);
+}
+// Suma de publicidad cuya fecha cae en [startStr, endStr] (YYYY-MM-DD, inclusive)
+function adSpendInRange(list, startStr, endStr) {
+  return (list || []).filter(e => e.fecha && e.fecha >= startStr && e.fecha <= endStr)
+                     .reduce((a, e) => a + (Number(e.monto) || 0), 0);
+}
+// Gastos (publicidad + fijos) imputables a un período de Métricas.
+// period: 'hoy'|'mes'|'trim'|'año'|'todo'; devuelve { ads, fixed, total } redondeado.
+function expensesForPeriod(adSpend, fixedExpenses, period, now = new Date()) {
+  const y = now.getFullYear(), m = now.getMonth();
+  const pad = n => String(n).padStart(2, '0');
+  const ymd = (yy, mm, dd) => `${yy}-${pad(mm + 1)}-${pad(dd)}`;
+  const lastDay = mm => new Date(y, mm + 1, 0).getDate();
+  const fixedM = fixedMonthlyTotal(fixedExpenses);
+  let ads = 0, fixed = 0;
+  if (period === 'hoy') {
+    const t = ymd(y, m, now.getDate());
+    ads = adSpendInRange(adSpend, t, t); fixed = fixedM / 30; // prorrateo diario
+  } else if (period === 'mes') {
+    ads = adSpendInRange(adSpend, ymd(y, m, 1), ymd(y, m, lastDay(m))); fixed = fixedM;
+  } else if (period === 'trim') {
+    const qs = Math.floor(m / 3) * 3;
+    ads = adSpendInRange(adSpend, ymd(y, qs, 1), ymd(y, qs + 2, lastDay(qs + 2))); fixed = fixedM * 3;
+  } else if (period === 'año') {
+    ads = adSpendInRange(adSpend, ymd(y, 0, 1), ymd(y, 11, 31)); fixed = fixedM * 12;
+  } else {
+    ads = (adSpend || []).reduce((a, e) => a + (Number(e.monto) || 0), 0); fixed = fixedM;
+  }
+  return { ads: Math.round(ads), fixed: Math.round(fixed), total: Math.round(ads + fixed) };
+}
+
 // Prendas — simplified to the 4 personalizable types
 const PRENDAS = [
   {
@@ -1526,6 +1563,8 @@ function Icon({ name, size = 16 }) {
     case 'user':      return <svg {...common}><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>;
     case 'trash':     return <svg {...common}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>;
     case 'phone':     return <svg {...common}><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.1-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7l.7 3.2a2 2 0 0 1-.5 1.8L8 10a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 1.8-.5l3.2.7a2 2 0 0 1 1.7 2z"/></svg>;
+    case 'money':     return <svg {...common}><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9v6M18 9v6"/></svg>;
+    case 'megaphone': return <svg {...common}><path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1zM14 8a4 4 0 0 1 0 8M18 5a8 8 0 0 1 0 14"/></svg>;
     default: return null;
   }
 }
@@ -2401,7 +2440,7 @@ Object.assign(window, { NuevaVenta });
 // Métricas dashboard — datos en tiempo real desde orders
 const MES_LABELS = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
 
-function Metricas({ orders = [], designs = [], payConfig = PAY_CONFIG_DEFAULT }) {
+function Metricas({ orders = [], designs = [], payConfig = PAY_CONFIG_DEFAULT, adSpend = [], fixedExpenses = [] }) {
   const [period, setPeriod] = useState('mes');
   const now = new Date();
   const cy = now.getFullYear(), cm = now.getMonth();
@@ -2440,20 +2479,22 @@ function Metricas({ orders = [], designs = [], payConfig = PAY_CONFIG_DEFAULT })
     const bruta = hoy.reduce((a,o) => a + o.total, 0);
     const inv   = hoy.reduce((a,o) => a + calcInversion(o), 0);
     const com   = hoy.reduce((a,o) => a + calcComisionNeta(o, payConfig), 0);
+    const gastos = expensesForPeriod(adSpend, fixedExpenses, 'hoy', now); // publicidad hoy + fijos/30
     const cobrado   = hoy.filter(o => !o.payStatus?.endsWith('-pending')).reduce((a,o) => a + o.total, 0);
     const pendiente = hoy.filter(o =>  o.payStatus?.endsWith('-pending')).reduce((a,o) => a + o.total, 0);
-    return { pedidos: hoy.length, bruta, ganancia: bruta - inv - com, cobrado, pendiente };
-  }, [orders, payConfig]);
+    return { pedidos: hoy.length, bruta, ganancia: bruta - inv - com - gastos.total, cobrado, pendiente };
+  }, [orders, payConfig, adSpend, fixedExpenses]);
 
   const kpis = useMemo(() => {
     const bruta       = filteredOrders.reduce((a,o) => a + o.total, 0);
     const recolectado = filteredOrders.filter(o => !o.payStatus?.endsWith('-pending')).reduce((a,o) => a + o.total, 0);
     const inversion   = filteredOrders.reduce((a,o) => a + calcInversion(o), 0);
     const comisiones  = filteredOrders.reduce((a,o) => a + calcComisionNeta(o, payConfig), 0);
-    const ganancia    = bruta - inversion - comisiones;
+    const gastos      = expensesForPeriod(adSpend, fixedExpenses, period, now); // { ads, fixed, total }
+    const ganancia    = bruta - inversion - comisiones - gastos.total;
     const margen      = bruta > 0 ? (ganancia/bruta)*100 : 0;
-    return { bruta, recolectado, inversion, comisiones, ganancia, margen };
-  }, [filteredOrders, payConfig]);
+    return { bruta, recolectado, inversion, comisiones, publicidad: gastos.ads, fijos: gastos.fixed, ganancia, margen };
+  }, [filteredOrders, payConfig, adSpend, fixedExpenses, period]);
 
   const weekData = useMemo(() => {
     const monthOrders = activeOrders.filter(o => { const d=new Date(o.fecha); return d.getFullYear()===cy && d.getMonth()===cm; });
@@ -2504,11 +2545,18 @@ function Metricas({ orders = [], designs = [], payConfig = PAY_CONFIG_DEFAULT })
       map[key].comisiones+=calcComisionNeta(o, payConfig);
     });
     const curKey=`${MES_LABELS[cm]} ${String(cy).slice(2)}`;
+    const pad = n => String(n).padStart(2,'0');
+    const fixedM = fixedMonthlyTotal(fixedExpenses);
     return Object.values(map)
       .sort((a,b)=>a.year!==b.year?a.year-b.year:a.month-b.month)
       .slice(-6)
-      .map(m=>({...m,ganancia:m.bruta-m.inversion-m.comisiones,margen:m.bruta>0?((m.bruta-m.inversion-m.comisiones)/m.bruta)*100:0,current:m.mes===curKey}));
-  }, [orders, payConfig]);
+      .map(m=>{
+        const start=`${m.year}-${pad(m.month+1)}-01`, end=`${m.year}-${pad(m.month+1)}-${pad(new Date(m.year,m.month+1,0).getDate())}`;
+        const gastos = adSpendInRange(adSpend, start, end) + fixedM; // publicidad del mes + fijos mensuales
+        const ganancia = m.bruta - m.inversion - m.comisiones - gastos;
+        return {...m, gastos, ganancia, margen: m.bruta>0?(ganancia/m.bruta)*100:0, current:m.mes===curKey};
+      });
+  }, [orders, payConfig, adSpend, fixedExpenses]);
 
   const maxWeek = Math.max(...weekData.map(w=>w.v), 1);
   const periodLabel = period==='hoy'?'HOY':period==='mes'?`${MES_LABELS[cm]} ${String(cy).slice(2)}`:period==='trim'?'TRIMESTRE':'AÑO';
@@ -2571,6 +2619,33 @@ function Metricas({ orders = [], designs = [], payConfig = PAY_CONFIG_DEFAULT })
         <div className="kpi">
           <div className="label"><span className="idx">05</span>Margen</div>
           <div className="value">{kpis.margen.toFixed(1)}<span className="unit">%</span></div>
+        </div>
+      </div>
+
+      {/* Desglose: cómo se llega a la ganancia neta */}
+      <div className="panel crop" style={{ marginBottom: 24 }}>
+        <div className="panel-head"><div className="panel-title">DESGLOSE DE GANANCIA · <span className="dim">{periodLabel}</span></div></div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, padding: '16px 20px', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+          {[
+            { lbl: 'Venta bruta', val: kpis.bruta, color: 'var(--text)', op: '' },
+            { lbl: 'Inversión', val: kpis.inversion, color: 'var(--warn)', op: '−' },
+            { lbl: 'Comisiones', val: kpis.comisiones, color: 'var(--warn)', op: '−' },
+            { lbl: 'Publicidad', val: kpis.publicidad, color: 'var(--warn)', op: '−' },
+            { lbl: 'Gastos fijos', val: kpis.fijos, color: 'var(--warn)', op: '−' },
+          ].map((x, i) => (
+            <React.Fragment key={x.lbl}>
+              {i > 0 && <span style={{ color: 'var(--dim)', margin: '0 6px', fontSize: 14 }}>{x.op}</span>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '4px 10px' }}>
+                <span style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--dim)' }}>{x.lbl}</span>
+                <span style={{ color: x.color, fontWeight: 600, fontSize: 13 }}>{x.op}{L(x.val)}</span>
+              </div>
+            </React.Fragment>
+          ))}
+          <span style={{ color: 'var(--dim)', margin: '0 6px', fontSize: 16 }}>=</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '6px 14px', background: kpis.ganancia >= 0 ? 'rgba(123,201,111,.1)' : 'rgba(230,57,70,.1)', borderRadius: 8, border: `1px solid ${kpis.ganancia >= 0 ? 'var(--ok)' : 'var(--accent)'}` }}>
+            <span style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Ganancia neta</span>
+            <span style={{ color: kpis.ganancia >= 0 ? 'var(--ok)' : 'var(--accent)', fontWeight: 800, fontSize: 15 }}>{L(kpis.ganancia)}</span>
+          </div>
         </div>
       </div>
 
@@ -4899,6 +4974,208 @@ function Configuracion({ payConfig, setPayConfig, stockThreshold = 3, setStockTh
 Object.assign(window, { Configuracion });
 </script>
 <script type="text/babel">
+// ═══════════════════════════════════════════════════════════════
+// MÓDULO GASTOS — Publicidad + Gastos fijos mensuales
+// ═══════════════════════════════════════════════════════════════
+function Gastos({ adSpend, setAdSpend, fixedExpenses, setFixedExpenses }) {
+  const [tab, setTab] = useState('publicidad');
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const mStart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+  const mEnd   = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate())}`;
+  const pubMes   = adSpendInRange(adSpend, mStart, mEnd);
+  const fijosMes = fixedMonthlyTotal(fixedExpenses);
+
+  return (
+    <div>
+      <div className="page-head">
+        <div>
+          <div className="page-kicker">MÓDULO · 06 / GASTOS</div>
+          <div className="page-title">Gastos</div>
+          <div className="page-desc">Registrá el gasto de publicidad y los costos fijos mensuales. Se descuentan de la ganancia neta en Métricas.</div>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div className="chip">PUBLICIDAD · MES <span className="v mono">{L(pubMes)}</span></div>
+          <div className="chip">FIJOS · MES <span className="v mono">{L(fijosMes)}</span></div>
+        </div>
+      </div>
+
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--line)', marginBottom: 32 }}>
+        {[
+          { id: 'publicidad', label: 'Publicidad',     sub: `${L(pubMes)} este mes` },
+          { id: 'fijos',      label: 'Fijos mensuales', sub: `${L(fijosMes)} / mes` },
+        ].map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '16px 28px', textAlign: 'left', borderBottom: tab === t.id ? '2px solid var(--accent)' : '2px solid transparent', marginBottom: '-2px' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: tab === t.id ? 'var(--text)' : 'var(--muted)' }}>{t.label}</div>
+            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.1em', color: tab === t.id ? 'var(--accent)' : 'var(--dim)', marginTop: 2 }}>{t.sub}</div>
+          </button>
+        ))}
+      </div>
+
+      {tab === 'publicidad' && <PublicidadTab adSpend={adSpend} setAdSpend={setAdSpend} />}
+      {tab === 'fijos'      && <FijosTab fixedExpenses={fixedExpenses} setFixedExpenses={setFixedExpenses} />}
+    </div>
+  );
+}
+
+function PublicidadTab({ adSpend, setAdSpend }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [form, setForm] = useState({ fecha: today, plataforma: 'Instagram', monto: '', nota: '' });
+
+  const add = () => {
+    const monto = Number(form.monto) || 0;
+    if (monto <= 0) { uiAlert({ title: 'Monto inválido', message: 'Ingresá un monto mayor a 0.' }); return; }
+    setAdSpend(prev => [{ id: crypto.randomUUID().slice(0, 8), fecha: form.fecha, plataforma: form.plataforma, monto, nota: form.nota.trim() }, ...prev]);
+    setForm({ fecha: form.fecha, plataforma: form.plataforma, monto: '', nota: '' });
+  };
+  const del = (id) => {
+    const item = adSpend.find(e => e.id === id);
+    uiConfirm({ title: 'Eliminar gasto', message: `Se quitará el registro de ${L(item?.monto || 0)} en ${item?.plataforma || ''}.`, confirmLabel: 'Eliminar' })
+      .then(ok => { if (ok) setAdSpend(prev => prev.filter(e => e.id !== id)); });
+  };
+
+  const sorted = [...adSpend].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  const total = adSpend.reduce((a, e) => a + (Number(e.monto) || 0), 0);
+
+  const fieldStyle = { background: '#0B0B0B', border: '1px solid var(--line)', padding: '10px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'inherit', borderRadius: 8 };
+  const labelStyle = { fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 5 };
+
+  return (
+    <div>
+      <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '150px 160px 130px 1fr auto', gap: 14, alignItems: 'end' }}>
+          <div><label style={labelStyle}>Fecha</label><input type="date" style={fieldStyle} value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} /></div>
+          <div><label style={labelStyle}>Plataforma</label><select style={fieldStyle} value={form.plataforma} onChange={e => setForm(f => ({ ...f, plataforma: e.target.value }))}>{GASTO_PLATAFORMAS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+          <div><label style={labelStyle}>Monto (L)</label><input type="number" min="0" style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }} placeholder="0" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))} onKeyDown={e => e.key === 'Enter' && add()} /></div>
+          <div><label style={labelStyle}>Nota (opcional)</label><input style={fieldStyle} placeholder="Ej. Campaña colección nueva" value={form.nota} onChange={e => setForm(f => ({ ...f, nota: e.target.value }))} onKeyDown={e => e.key === 'Enter' && add()} /></div>
+          <button className="btn primary" onClick={add} style={{ height: 40 }}><Icon name="plus" size={12} /> Agregar</button>
+        </div>
+      </div>
+
+      <div className="panel crop">
+        <table className="tbl">
+          <thead><tr><th>Fecha</th><th>Plataforma</th><th>Nota</th><th style={{ textAlign: 'right' }}>Monto</th><th></th></tr></thead>
+          <tbody>
+            {sorted.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--dim)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Sin gastos de publicidad registrados</td></tr>}
+            {sorted.map(e => (
+              <tr key={e.id}>
+                <td className="mono" style={{ fontSize: 12 }}>{e.fecha}</td>
+                <td>{e.plataforma}</td>
+                <td style={{ color: 'var(--muted)', fontSize: 12 }}>{e.nota || '—'}</td>
+                <td className="num" style={{ color: 'var(--warn)' }}>−{L(e.monto)}</td>
+                <td onClick={ev => ev.stopPropagation()} style={{ textAlign: 'right' }}>
+                  <button className="btn sm ghost" title="Eliminar" style={{ color: 'var(--accent)' }} onClick={() => del(e.id)}><Icon name="trash" size={11} /></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="panel-footer">
+          <div className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{adSpend.length} REGISTROS</div>
+          <div style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 12 }}><span className="muted">TOTAL HISTÓRICO </span><span style={{ color: 'var(--warn)' }}>−{L(total)}</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FijosTab({ fixedExpenses, setFixedExpenses }) {
+  const [form, setForm] = useState({ nombre: '', categoria: 'Suscripción', monto: '' });
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+
+  const add = () => {
+    if (!form.nombre.trim()) { uiAlert({ title: 'Falta el nombre', message: 'Ingresá el nombre del gasto fijo.' }); return; }
+    const monto = Number(form.monto) || 0;
+    if (monto <= 0) { uiAlert({ title: 'Monto inválido', message: 'Ingresá un monto mensual mayor a 0.' }); return; }
+    setFixedExpenses(prev => [...prev, { id: crypto.randomUUID().slice(0, 8), nombre: form.nombre.trim(), categoria: form.categoria, monto, activo: true }]);
+    setForm({ nombre: '', categoria: 'Suscripción', monto: '' });
+  };
+  const toggle = (id) => setFixedExpenses(prev => prev.map(f => f.id === id ? { ...f, activo: f.activo === false } : f));
+  const del = (id) => {
+    const item = fixedExpenses.find(f => f.id === id);
+    uiConfirm({ title: 'Eliminar gasto fijo', message: `Se quitará "${item?.nombre || ''}" (${L(item?.monto || 0)}/mes).`, confirmLabel: 'Eliminar' })
+      .then(ok => { if (ok) setFixedExpenses(prev => prev.filter(f => f.id !== id)); });
+  };
+  const startEdit = (f) => { setEditingId(f.id); setEditForm({ nombre: f.nombre, categoria: f.categoria, monto: f.monto }); };
+  const saveEdit = () => {
+    setFixedExpenses(prev => prev.map(f => f.id === editingId ? { ...f, nombre: editForm.nombre.trim() || f.nombre, categoria: editForm.categoria, monto: Number(editForm.monto) || f.monto } : f));
+    setEditingId(null);
+  };
+
+  const activos = fixedExpenses.filter(f => f.activo !== false);
+  const totalMes = fixedMonthlyTotal(fixedExpenses);
+  const totalAnual = totalMes * 12;
+
+  const fieldStyle = { background: '#0B0B0B', border: '1px solid var(--line)', padding: '10px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'inherit', borderRadius: 8 };
+  const labelStyle = { fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 5 };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 180, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '18px 20px' }}>
+          <div className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Total fijo mensual</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 32, letterSpacing: '-0.03em', color: 'var(--warn)' }}>{L(totalMes)}</div>
+        </div>
+        <div style={{ flex: 1, minWidth: 180, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '18px 20px' }}>
+          <div className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Proyección anual</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 32, letterSpacing: '-0.03em', color: 'var(--muted)' }}>{L(totalAnual)}</div>
+        </div>
+        <div style={{ flex: 1, minWidth: 180, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '18px 20px' }}>
+          <div className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Gastos activos</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 32, letterSpacing: '-0.03em' }}>{activos.length}<span className="mono" style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 400, marginLeft: 6 }}>de {fixedExpenses.length}</span></div>
+        </div>
+      </div>
+
+      <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px 150px auto', gap: 14, alignItems: 'end' }}>
+          <div><label style={labelStyle}>Nombre</label><input style={fieldStyle} placeholder="Ej. Canva Pro, Adobe, alquiler…" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} onKeyDown={e => e.key === 'Enter' && add()} /></div>
+          <div><label style={labelStyle}>Categoría</label><select style={fieldStyle} value={form.categoria} onChange={e => setForm(f => ({ ...f, categoria: e.target.value }))}>{GASTO_CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+          <div><label style={labelStyle}>Monto/mes (L)</label><input type="number" min="0" style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }} placeholder="0" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))} onKeyDown={e => e.key === 'Enter' && add()} /></div>
+          <button className="btn primary" onClick={add} style={{ height: 40 }}><Icon name="plus" size={12} /> Agregar</button>
+        </div>
+      </div>
+
+      <div className="panel crop">
+        <table className="tbl">
+          <thead><tr><th>Nombre</th><th>Categoría</th><th style={{ textAlign: 'right' }}>Monto/mes</th><th style={{ textAlign: 'center' }}>Activo</th><th></th></tr></thead>
+          <tbody>
+            {fixedExpenses.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--dim)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Sin gastos fijos registrados</td></tr>}
+            {fixedExpenses.map(f => editingId === f.id ? (
+              <tr key={f.id} style={{ background: '#141414' }}>
+                <td><input style={fieldStyle} value={editForm.nombre} onChange={e => setEditForm(x => ({ ...x, nombre: e.target.value }))} /></td>
+                <td><select style={fieldStyle} value={editForm.categoria} onChange={e => setEditForm(x => ({ ...x, categoria: e.target.value }))}>{GASTO_CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}</select></td>
+                <td><input type="number" min="0" style={{ ...fieldStyle, fontFamily: 'var(--font-mono)', textAlign: 'right' }} value={editForm.monto} onChange={e => setEditForm(x => ({ ...x, monto: e.target.value }))} /></td>
+                <td></td>
+                <td style={{ textAlign: 'right' }}><div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}><button className="btn sm primary" onClick={saveEdit}><Icon name="check" size={11} /></button><button className="btn sm ghost" onClick={() => setEditingId(null)}><Icon name="x" size={11} /></button></div></td>
+              </tr>
+            ) : (
+              <tr key={f.id} style={{ opacity: f.activo === false ? 0.5 : 1 }}>
+                <td style={{ fontWeight: 500 }}>{f.nombre}</td>
+                <td className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{f.categoria}</td>
+                <td className="num" style={{ color: f.activo === false ? 'var(--dim)' : 'var(--warn)' }}>−{L(f.monto)}</td>
+                <td style={{ textAlign: 'center' }}>
+                  <button onClick={() => toggle(f.id)} title={f.activo === false ? 'Activar' : 'Pausar'} style={{ width: 36, height: 20, borderRadius: 999, background: f.activo === false ? 'var(--line-2)' : 'var(--ok)', position: 'relative', transition: 'background .15s', display: 'inline-block' }}>
+                    <span style={{ position: 'absolute', top: 2, left: f.activo === false ? 2 : 18, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
+                  </button>
+                </td>
+                <td style={{ textAlign: 'right' }}><div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}><button className="btn sm ghost" title="Editar" onClick={() => startEdit(f)}><Icon name="edit" size={11} /></button><button className="btn sm ghost" title="Eliminar" style={{ color: 'var(--accent)' }} onClick={() => del(f.id)}><Icon name="trash" size={11} /></button></div></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="panel-footer">
+          <div className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{fixedExpenses.length} GASTOS · {activos.length} ACTIVOS</div>
+          <div style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 12 }}><span className="muted">TOTAL ACTIVO / MES </span><span style={{ color: 'var(--warn)' }}>−{L(totalMes)}</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+Object.assign(window, { Gastos });
+</script>
+<script type="text/babel">
 // ── Acceso exclusivo ──────────────────────────────────────────
 // El PIN ya NO está en el código fuente.
 // Se guarda en Firestore → data/auth → { pin: "XXXX" }
@@ -5218,6 +5495,9 @@ function App({ onLogout }) {
   const [designCats, setDesignCats] = useS(DESIGN_CATS_DEFAULT);
   const [payConfig, setPayConfig] = useS(PAY_CONFIG_DEFAULT);
   const [stockThreshold, setStockThreshold] = useS(3);
+  // Gastos: publicidad (registros con fecha) + fijos mensuales (recurrentes)
+  const [adSpend, setAdSpend] = useS([]);
+  const [fixedExpenses, setFixedExpenses] = useS([]);
   const [tweaksOpen, setTweaksOpen] = useS(false);
   const [tweaks, setTweaks] = useS(window.__TWEAKS__);
   const [gSearch, setGSearch] = useS('');
@@ -5493,15 +5773,20 @@ function App({ onLogout }) {
         col.doc('clients').get(),
         col.doc('config').get(),
         col.doc('inventory').get(),
+        col.doc('expenses').get(),
       ]),
       timeout,
-    ]).then(([oDoc, cDoc, cfDoc, invDoc]) => {
+    ]).then(([oDoc, cDoc, cfDoc, invDoc, exDoc]) => {
       if (oDoc.exists && oDoc.data().items?.length) setOrders(oDoc.data().items);
       if (cDoc.exists && cDoc.data().items?.length) setClients(cDoc.data().items);
       if (cfDoc.exists && cfDoc.data().payConfig?.length) {
         setPayConfig(cfDoc.data().payConfig);
         if (cfDoc.data().designCats?.length) setDesignCats(cfDoc.data().designCats);
         if (cfDoc.data().stockThreshold != null) setStockThreshold(cfDoc.data().stockThreshold);
+      }
+      if (exDoc.exists) {
+        if (exDoc.data().adSpend?.length)       setAdSpend(exDoc.data().adSpend);
+        if (exDoc.data().fixedExpenses?.length) setFixedExpenses(exDoc.data().fixedExpenses);
       }
       if (invDoc.exists) {
         const d = invDoc.data();
@@ -5538,6 +5823,7 @@ function App({ onLogout }) {
   useE(() => { if (fbReady) fbSave('orders',  { items: orders }); },    [orders,  fbReady]);
   useE(() => { if (fbReady) fbSave('clients', { items: clients }); },   [clients, fbReady]);
   useE(() => { if (fbReady) fbSave('config',  { payConfig, designCats, stockThreshold }); }, [payConfig, designCats, stockThreshold, fbReady]);
+  useE(() => { if (fbReady) fbSave('expenses', { adSpend, fixedExpenses }); }, [adSpend, fixedExpenses, fbReady]);
   // Inventory saves are now EXPLICIT (scheduleInvSave) — never triggered reactively
   // to avoid overwriting Firebase with stale defaults during page load.
 
@@ -5598,14 +5884,17 @@ function App({ onLogout }) {
     };
     const monthOrders = orders.filter(thisMonth);
     const ventaMes = monthOrders.reduce((a, o) => a + (o.total || 0), 0);
-    const gananciaMes = monthOrders.reduce((a, o) => {
+    const gananciaBruta = monthOrders.reduce((a, o) => {
       const inv = (o.items || []).reduce((s, i) => s + ((i.shirtCost || 0) + (i.dtfCost || 0)) * (i.q || 1), 0);
       return a + (o.total || 0) - inv - calcComisionNeta(o, payConfig);
     }, 0);
+    // Resta publicidad del mes + gastos fijos mensuales → ganancia neta real
+    const gastosMes = expensesForPeriod(adSpend, fixedExpenses, 'mes', now);
+    const gananciaMes = gananciaBruta - gastosMes.total;
     const stockBajo = Object.values(stock).filter(v => v > 0 && v <= stockThreshold).length;
     const boxfulPend = orders.filter(o => o.payStatus === 'boxful-pending' && !['rebotado','perdido'].includes(o.estado)).length;
     return { mesLabel, ventaMes, gananciaMes, stockBajo, boxfulPend };
-  }, [orders, stock, stockThreshold, payConfig]);
+  }, [orders, stock, stockThreshold, payConfig, adSpend, fixedExpenses]);
 
   const handleOrderCreated = (order) => {
     // Stamp initial estado log
@@ -5743,7 +6032,8 @@ function App({ onLogout }) {
     { id: 'clientes',   label: 'Clientes',      num: '03', icon: 'user' },
     { id: 'inventario', label: 'Inventario',    num: '04', icon: 'box' },
     { id: 'metricas',   label: 'Métricas',      num: '05', icon: 'chart' },
-    { id: 'config',     label: 'Configuración', num: '06', icon: 'settings' },
+    { id: 'gastos',     label: 'Gastos',        num: '06', icon: 'money' },
+    { id: 'config',     label: 'Configuración', num: '07', icon: 'settings' },
   ];
 
   const currentModule = modules.find(m => m.id === route);
@@ -5943,7 +6233,8 @@ function App({ onLogout }) {
               stockThreshold={stockThreshold}
               invDirty={invDirty} commitInv={commitInv} cancelInv={cancelInv} invSaving={invSaving}
             />}
-          {route === 'metricas'   && <Metricas orders={orders} designs={designs} payConfig={payConfig} />}
+          {route === 'metricas'   && <Metricas orders={orders} designs={designs} payConfig={payConfig} adSpend={adSpend} fixedExpenses={fixedExpenses} />}
+          {route === 'gastos'     && <Gastos adSpend={adSpend} setAdSpend={setAdSpend} fixedExpenses={fixedExpenses} setFixedExpenses={setFixedExpenses} />}
           {route === 'config'     && <Configuracion payConfig={payConfig} setPayConfig={setPayConfig} stockThreshold={stockThreshold} setStockThreshold={setStockThreshold} />}
         </div>
       </div>

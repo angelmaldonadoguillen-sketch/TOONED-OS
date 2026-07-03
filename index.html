@@ -2753,7 +2753,6 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete, payConfig = PAY_CONFIG_D
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn" onClick={exportCSV} title={`Exportar ${sortedFiltered.length} pedidos a CSV`}><Icon name="dl" size={12} /> Excel · {sortedFiltered.length}</button>
-          <button className="btn"><Icon name="refresh" size={12} /> Importar reporte Boxful</button>
         </div>
       </div>
 
@@ -5739,14 +5738,6 @@ function App({ onLogout }) {
             </button>
           ))}
         </nav>
-
-        {!tweaks.sidebarCollapsed && <>
-          <div className="sidebar-section">Accesos rápidos</div>
-          <nav className="nav">
-            <button className="nav-item"><Icon name="printer" size={15} /><span>Etiquetas Boxful</span></button>
-            <button className="nav-item"><Icon name="refresh" size={15} /><span>Sync inventario</span></button>
-          </nav>
-        </>}
 
         <div className="sidebar-footer">
           {/* PWA install button */}

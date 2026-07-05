@@ -3293,7 +3293,23 @@ function OrderModal({ order: o, designs, prendas, payConfig = PAY_CONFIG_DEFAULT
 }
 
 // Popover menu for pay/estado edit
+// Reposiciona un popover fixed para que quede siempre dentro de la pantalla.
+function clampMenuToViewport(el, x, y, margin = 8) {
+  const h = el.offsetHeight, w = el.offsetWidth;
+  const vh = window.innerHeight, vw = window.innerWidth;
+  let top = y, left = x;
+  if (top + h > vh - margin) top = Math.max(margin, vh - h - margin);
+  if (left + w > vw - margin) left = Math.max(margin, vw - w - margin);
+  return { top, left };
+}
+
 function PayMenu({ menu, onPick, onClose }) {
+  const ref = useRef(null);
+  const [pos, setPos] = useState(null);
+  React.useLayoutEffect(() => {
+    if (!menu || !ref.current) { setPos(null); return; }
+    setPos(clampMenuToViewport(ref.current, menu.x, menu.y));
+  }, [menu?.x, menu?.y, menu?.pay]);
   if (!menu) return null;
   const opts = menu.pay === 'boxful'
     ? [{ id: 'boxful-pending', label: 'Pendiente Boxful', hint: 'No suma a recolectado' },
@@ -3303,7 +3319,7 @@ function PayMenu({ menu, onPick, onClose }) {
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 98 }} />
-      <div style={{ position: 'fixed', left: menu.x, top: menu.y, zIndex: 99, background: 'var(--card)', border: '1px solid var(--line-2)', borderRadius: 12, minWidth: 240, boxShadow: '0 12px 40px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
+      <div ref={ref} style={{ position: 'fixed', left: pos ? pos.left : menu.x, top: pos ? pos.top : menu.y, zIndex: 99, background: 'var(--card)', border: '1px solid var(--line-2)', borderRadius: 12, minWidth: 240, maxHeight: 'calc(100vh - 16px)', overflowY: 'auto', boxShadow: '0 12px 40px rgba(0,0,0,0.6)' }}>
         <div style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', color: 'var(--muted)', textTransform: 'uppercase', borderBottom: '1px solid var(--line)' }}>
           Cambiar estado de pago
         </div>
@@ -3319,11 +3335,17 @@ function PayMenu({ menu, onPick, onClose }) {
 }
 
 function EstadoMenu({ menu, onPick, onClose }) {
+  const ref = useRef(null);
+  const [pos, setPos] = useState(null);
+  React.useLayoutEffect(() => {
+    if (!menu || !ref.current) { setPos(null); return; }
+    setPos(clampMenuToViewport(ref.current, menu.x, menu.y));
+  }, [menu?.x, menu?.y]);
   if (!menu) return null;
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 98 }} />
-      <div style={{ position: 'fixed', left: menu.x, top: menu.y, zIndex: 99, background: 'var(--card)', border: '1px solid var(--line-2)', borderRadius: 12, minWidth: 200, boxShadow: '0 12px 40px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
+      <div ref={ref} style={{ position: 'fixed', left: pos ? pos.left : menu.x, top: pos ? pos.top : menu.y, zIndex: 99, background: 'var(--card)', border: '1px solid var(--line-2)', borderRadius: 12, minWidth: 200, maxHeight: 'calc(100vh - 16px)', overflowY: 'auto', boxShadow: '0 12px 40px rgba(0,0,0,0.6)' }}>
         <div style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', color: 'var(--muted)', textTransform: 'uppercase', borderBottom: '1px solid var(--line)' }}>
           Estado del pedido
         </div>

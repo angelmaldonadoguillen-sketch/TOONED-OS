@@ -1,6 +1,6 @@
-// TOONED OS — Service Worker v4
+// TOONED OS — Service Worker v5
 // Estrategia: cache-first para el shell, network-first para Firebase y fuentes
-const CACHE = 'tooned-os-v4';
+const CACHE = 'tooned-os-v5';
 const SHELL = ['./index.html', './', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {

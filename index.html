@@ -5383,6 +5383,11 @@ const { useState: useS, useEffect: useE } = React;
 function StockBell({ alerts = [] }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
+  // Clave estable por alerta: identidad + severidad (para re-notificar si cambia)
+  const keyOf = (a) => `${a.label}|${a.agotado ? 'ago' : 'bajo'}`;
+  const [readKeys, setReadKeys] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem('bell-read') || '[]'); } catch (e) { return []; }
+  });
 
   React.useEffect(() => {
     if (!open) return;
@@ -5391,19 +5396,49 @@ function StockBell({ alerts = [] }) {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  const currentKeys = alerts.map(keyOf);
+
+  // Podá claves leídas que ya no están activas → si el ítem vuelve a bajar, re-notifica
+  React.useEffect(() => {
+    setReadKeys(prev => {
+      const pruned = prev.filter(k => currentKeys.includes(k));
+      return pruned.length === prev.length ? prev : pruned;
+    });
+  }, [alerts]);
+
+  React.useEffect(() => {
+    try { localStorage.setItem('bell-read', JSON.stringify(readKeys)); } catch (e) {}
+  }, [readKeys]);
+
+  const isRead = (a) => readKeys.includes(keyOf(a));
   const agotados = alerts.filter(a => a.agotado);
   const bajos    = alerts.filter(a => !a.agotado);
   const total    = alerts.length;
+  const unreadCount = alerts.filter(a => !isRead(a)).length;
+  const markAllRead = () => setReadKeys(alerts.map(keyOf));
+
+  const renderItem = (a, i, cls, right) => {
+    const read = isRead(a);
+    return (
+      <div key={i} className={`bell-item ${cls}`} style={{ opacity: read ? 0.45 : 1 }}>
+        <span className="bell-item-label" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: read ? 'transparent' : (a.agotado ? 'var(--accent)' : 'var(--warn)') }} />
+          {a.label}
+        </span>
+        <span className="bell-item-qty">{right}</span>
+      </div>
+    );
+  };
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button
-        className={`bell-btn${total > 0 ? ' has-alerts' : ''}`}
+        className={`bell-btn${unreadCount > 0 ? ' has-alerts' : ''}`}
         onClick={() => setOpen(o => !o)}
-        title={total > 0 ? `${total} ítem${total > 1 ? 's' : ''} con stock bajo` : 'Sin alertas de stock'}
+        title={unreadCount > 0 ? `${unreadCount} alerta${unreadCount > 1 ? 's' : ''} de stock sin leer` : total > 0 ? 'Alertas de stock (todas leídas)' : 'Sin alertas de stock'}
       >
         🔔
-        {total > 0 && <span className="bell-badge">{total > 99 ? '99+' : total}</span>}
+        {unreadCount > 0 && <span className="bell-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>}
       </button>
 
       {open && (
@@ -5417,27 +5452,30 @@ function StockBell({ alerts = [] }) {
             <div className="bell-empty">✓ Todo el stock está OK</div>
           ) : (
             <>
+              {unreadCount > 0 && (
+                <button
+                  onClick={markAllRead}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '9px 12px', borderBottom: '1px solid var(--line)', background: 'transparent', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,.04)'; e.currentTarget.style.color = 'var(--text)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--muted)'; }}
+                >
+                  ✓ Marcar todo como leído
+                </button>
+              )}
               {agotados.length > 0 && (
                 <div className="bell-section">
                   <div className="bell-section-label">AGOTADO</div>
-                  {agotados.map((a, i) => (
-                    <div key={i} className="bell-item agotado">
-                      <span className="bell-item-label">{a.label}</span>
-                      <span className="bell-item-qty">AGOTADO</span>
-                    </div>
-                  ))}
+                  {agotados.map((a, i) => renderItem(a, i, 'agotado', 'AGOTADO'))}
                 </div>
               )}
               {bajos.length > 0 && (
                 <div className="bell-section">
                   <div className="bell-section-label">BAJO · ≤ umbral</div>
-                  {bajos.map((a, i) => (
-                    <div key={i} className="bell-item bajo">
-                      <span className="bell-item-label">{a.label}</span>
-                      <span className="bell-item-qty">{a.qty} ud</span>
-                    </div>
-                  ))}
+                  {bajos.map((a, i) => renderItem(a, i, 'bajo', `${a.qty} ud`))}
                 </div>
+              )}
+              {unreadCount === 0 && (
+                <div className="bell-empty" style={{ padding: '10px 14px', color: 'var(--dim)' }}>✓ Todas leídas</div>
               )}
             </>
           )}

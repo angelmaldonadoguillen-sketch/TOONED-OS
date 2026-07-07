@@ -2758,7 +2758,7 @@ Object.assign(window, { Metricas });
 <script type="text/babel">
 // Ventas table
 function Ventas({ orders, onOrderUpdate, onOrderDelete, payConfig = PAY_CONFIG_DEFAULT, designs = CATALOG, prendas = PRENDAS }) {
-  const [filters, setFilters] = useState({ estado: 'all', pay: 'all', canal: 'all', fecha: 'all', q: '' });
+  const [filters, setFilters] = useState({ estado: 'all', pay: 'all', canal: 'all', fecha: 'all', desde: '', hasta: '', q: '' });
   const [sort, setSort] = useState({ col: 'n', dir: 'desc' }); // columna activa y dirección
   const [modalOrder, setModalOrder] = useState(null);
   const [payMenu, setPayMenu] = useState(null); // { orderN, x, y }
@@ -2827,6 +2827,11 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete, payConfig = PAY_CONFIG_D
       else if (filters.fecha === 'semana') { const t = new Date(); t.setDate(t.getDate()-7); if (d < t) return false; }
       else if (filters.fecha === 'mes') { if (d.getFullYear()!==now.getFullYear()||d.getMonth()!==now.getMonth()) return false; }
       else if (filters.fecha === '30d') { const t = new Date(); t.setDate(t.getDate()-30); if (d < t) return false; }
+      else if (filters.fecha === 'rango') {
+        // o.fecha es "YYYY-MM-DD" → comparación de strings funciona (inclusive)
+        if (filters.desde && o.fecha < filters.desde) return false;
+        if (filters.hasta && o.fecha > filters.hasta) return false;
+      }
     }
     return true;
   });
@@ -2908,10 +2913,23 @@ function Ventas({ orders, onOrderUpdate, onOrderDelete, payConfig = PAY_CONFIG_D
             <option value="semana">Última semana</option>
             <option value="mes">Este mes</option>
             <option value="30d">Últimos 30 días</option>
+            <option value="rango">Rango de fechas…</option>
           </select>
         </div>
+        {filters.fecha === 'rango' && (
+          <div className="filter-group">
+            <span className="flabel">Desde</span>
+            <input type="date" value={filters.desde} max={filters.hasta || undefined}
+              onChange={e => setFilters(f => ({ ...f, desde: e.target.value }))}
+              style={{ background: 'transparent', border: 0, color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 12, outline: 'none', colorScheme: 'dark' }} />
+            <span className="flabel" style={{ marginLeft: 8 }}>Hasta</span>
+            <input type="date" value={filters.hasta} min={filters.desde || undefined}
+              onChange={e => setFilters(f => ({ ...f, hasta: e.target.value }))}
+              style={{ background: 'transparent', border: 0, color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 12, outline: 'none', colorScheme: 'dark' }} />
+          </div>
+        )}
         {(filters.estado !== 'all' || filters.pay !== 'all' || filters.canal !== 'all' || filters.fecha !== 'all' || filters.q) && (
-          <button className="btn sm ghost" onClick={() => setFilters({ estado: 'all', pay: 'all', canal: 'all', fecha: 'all', q: '' })}>
+          <button className="btn sm ghost" onClick={() => setFilters({ estado: 'all', pay: 'all', canal: 'all', fecha: 'all', desde: '', hasta: '', q: '' })}>
             <Icon name="x" size={11} /> Limpiar
           </button>
         )}

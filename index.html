@@ -958,17 +958,16 @@ hr.divider { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
 
 /* little ticker at top */
 .ticker {
-  height: 32px;
+  height: 34px;
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
   padding: 0 24px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  letter-spacing: 0.01em;
   color: var(--muted);
-  gap: 28px;
-  text-transform: uppercase;
+  gap: 26px;
   background: #060606;
   overflow: hidden;
   white-space: nowrap;
@@ -3453,9 +3452,6 @@ function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStoc
       <div className="page-head">
         <div>
           <div className="page-title">Inventario</div>
-          <div className="page-desc">
-            Ingresá stock directamente en cada celda — usá los botones <strong style={{color:'var(--text)'}}>+ / −</strong> o escribí la cantidad. Tus cambios quedan en local hasta que pulses <strong style={{color:'var(--ok)'}}>GUARDAR CAMBIOS</strong>.
-          </div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <div className="chip">PRENDAS <span className="v mono">{totalPrendas} UDS</span></div>
@@ -3517,11 +3513,11 @@ function MovimientosTab({ log }) {
           const cfg = f ? MOV_COLORS[f] : null;
           return (
             <button key={f} onClick={() => setFilter(f)}
-              style={{ padding: '6px 14px', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em',
+              style={{ padding: '7px 16px', fontFamily: 'var(--font-body)', fontSize: 11, letterSpacing: '0.02em', fontWeight: 500, borderRadius: 'var(--r-pill)', cursor: 'pointer',
                 border: `1px solid ${filter === f ? (cfg?.dot || 'var(--accent)') : 'var(--line-2)'}`,
                 color: filter === f ? (cfg?.dot || 'var(--text)') : 'var(--muted)',
                 background: filter === f ? (cfg?.bg || 'transparent') : 'transparent' }}>
-              {f ? (MOV_COLORS[f]?.label || f.toUpperCase()) : 'TODOS'}
+              {f ? (MOV_COLORS[f]?.label || f.toUpperCase()) : 'Todos'}
             </button>
           );
         })}
@@ -3530,7 +3526,7 @@ function MovimientosTab({ log }) {
         </span>
       </div>
       {/* Log table */}
-      <div style={{ border: '1px solid var(--line)', overflow: 'hidden' }}>
+      <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '120px 80px 70px 1fr 1fr', background: '#0C0C0C', borderBottom: '1px solid var(--line)', padding: '8px 16px' }}>
           {['FECHA', 'TIPO', 'PEDIDO', 'CLAVE', 'DESCRIPCIÓN'].map(h => (
             <span key={h} className="mono" style={{ fontSize: 9, color: 'var(--dim)', letterSpacing: '0.14em' }}>{h}</span>
@@ -3700,6 +3696,7 @@ function PrendasStockTab({ prendas, setPrendas, stock, addStock, setStockVal, st
           <div key={p.id} style={{
             background: 'var(--card)',
             border: `1px solid ${isEditing ? 'var(--accent)' : 'var(--line)'}`,
+            borderRadius: 'var(--r-lg)',
             overflow: 'hidden',
             transition: 'border-color 0.15s',
           }}>
@@ -3866,7 +3863,7 @@ function PrendasStockTab({ prendas, setPrendas, stock, addStock, setStockVal, st
                 });
                 if (!lows.length) return null;
                 return (
-                  <div style={{ marginTop: 20, padding: '12px 16px', background: '#1A0A0A', border: '1px solid #3D1515', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <div style={{ marginTop: 20, padding: '12px 16px', background: '#1A0A0A', border: '1px solid #3D1515', borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                     <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, marginTop: 1 }}>⚠ BAJO STOCK</span>
                     <span className="mono" style={{ fontSize: 11, color: '#CC6666', letterSpacing: '0.04em' }}>{lows.join(' · ')}</span>
                   </div>
@@ -3965,6 +3962,8 @@ function StockStepper({ value, low, onAdd, onSub, onChange }) {
       border: `1px solid ${value === 0 ? 'var(--line)' : low ? '#5c4516' : 'var(--line-2)'}`,
       background: bgColor,
       height: 48,
+      borderRadius: 'var(--r-md)',
+      overflow: 'hidden',
     }}>
       <button
         onClick={onSub}
@@ -6161,10 +6160,7 @@ function App({ onLogout }) {
           title="Inicio — Nueva venta"
           style={{ cursor: 'pointer' }}>
           {!tweaks.sidebarCollapsed && (
-            <div>
-              <div className="wordmark">TOONED<span className="dot">.</span></div>
-              <div className="sidebar-sub">OS · v0.1 · HN</div>
-            </div>
+            <div className="wordmark">TOONED<span className="dot">.</span></div>
           )}
           {tweaks.sidebarCollapsed && (
             <div className="wordmark" style={{ fontSize: 16 }}>T<span className="dot">.</span></div>
@@ -6234,15 +6230,14 @@ function App({ onLogout }) {
           {pwaPrompt && !pwaInstalled && !tweaks.sidebarCollapsed && (
             <button
               onClick={() => pwaPrompt.prompt().then(r => { if (r.outcome === 'accepted') { setPwaInstalled(true); setPwaPrompt(null); } })}
-              style={{ width: '100%', marginBottom: 10, padding: '8px 12px', background: '#1A0A0E', border: '1px solid var(--accent)', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 14 }}>⬇</span> INSTALAR APP
+              style={{ width: '100%', marginBottom: 12, padding: '10px 14px', background: 'var(--accent)', border: 'none', borderRadius: 'var(--r-pill)', color: '#fff', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, letterSpacing: '0.01em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', transition: 'background .15s' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-ink)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'var(--accent)'}>
+              <span style={{ fontSize: 15 }}>⬇</span> Descargar app
             </button>
           )}
           {!tweaks.sidebarCollapsed ? (
-            <>
-              <span className="status-dot" />ONLINE · LOCAL<br />
-              <span style={{ color: 'var(--dim)' }}>FIREBASE · SYNC</span>
-            </>
+            <><span className="status-dot" />Online · sincronizado</>
           ) : (
             <span className="status-dot" />
           )}
@@ -6252,17 +6247,12 @@ function App({ onLogout }) {
       {/* Main */}
       <div className="main">
         <div className="ticker">
-          <span className="item">● SIST. OK</span>
-          <span className="sep">·</span>
-          <span className="item">PRÓX. ORDEN <span className="v">#{nextOrderNumber}</span></span>
-          <span className="sep">·</span>
-          <span className="item">{tickerStats.mesLabel} · VENTA <span className="v">{L(tickerStats.ventaMes)}</span></span>
-          <span className="sep">·</span>
-          <span className="item">GANANCIA <span className="v" style={{color: tickerStats.gananciaMes >= 0 ? 'var(--ok)' : 'var(--accent)'}}>{L(tickerStats.gananciaMes)}</span></span>
-          <span className="sep">·</span>
-          <span className="item">STOCK BAJO <span className="v" style={{color: tickerStats.stockBajo > 0 ? 'var(--warn)' : 'var(--muted)'}}>{tickerStats.stockBajo} SKU</span></span>
-          <span className="sep">·</span>
-          <span className="item">BOXFUL PEND <span className="v" style={{color: tickerStats.boxfulPend > 0 ? 'var(--warn)' : 'var(--muted)'}}>{tickerStats.boxfulPend}</span></span>
+          <span className="item">● Sistema OK</span>
+          <span className="item">Próx. orden <span className="v">#{nextOrderNumber}</span></span>
+          <span className="item">{tickerStats.mesLabel} · Venta <span className="v">{L(tickerStats.ventaMes)}</span></span>
+          <span className="item">Ganancia <span className="v" style={{color: tickerStats.gananciaMes >= 0 ? 'var(--ok)' : 'var(--accent)'}}>{L(tickerStats.gananciaMes)}</span></span>
+          <span className="item">Stock bajo <span className="v" style={{color: tickerStats.stockBajo > 0 ? 'var(--warn)' : 'var(--muted)'}}>{tickerStats.stockBajo} SKU</span></span>
+          <span className="item">Boxful pend. <span className="v" style={{color: tickerStats.boxfulPend > 0 ? 'var(--warn)' : 'var(--muted)'}}>{tickerStats.boxfulPend}</span></span>
         </div>
 
         <div className="topbar">

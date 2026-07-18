@@ -1616,9 +1616,11 @@ Object.assign(window, { Icon, StatusBadge, PayBadge, ColorDot, fmtItems, sumOrde
 </script>
 <script type="text/babel">
 // Nueva Venta — multi-step flow
-function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], payConfig = PAY_CONFIG_DEFAULT, onClientCreated, prendas = PRENDAS, designs = CATALOG, dtfStock = DTF_STOCK, stock = {} }) {
+function NuevaVenta({ onOrderCreated, onReset, nextOrderNumber, clients = [], payConfig = PAY_CONFIG_DEFAULT, onClientCreated, prendas = PRENDAS, designs = CATALOG, dtfStock = DTF_STOCK, stock = {}, initialCliente = null, onPrefillConsumed }) {
   const [step, setStep] = useState(1);
-  const [cliente, setCliente] = useState({ nombre: '', contacto: '', ciudad: '', canal: 'Instagram', direccion: '' });
+  const [cliente, setCliente] = useState(initialCliente || { nombre: '', contacto: '', ciudad: '', canal: 'Instagram', direccion: '' });
+  // Consume el prefill (viene del Embudo al convertir un prospecto) una sola vez al montar
+  useEffect(() => { if (initialCliente && onPrefillConsumed) onPrefillConsumed(); }, []);
 
   // Cart builder (step 2)
   const [pendingPrenda, setPendingPrenda] = useState(null);
@@ -5208,6 +5210,206 @@ function FijosTab({ fixedExpenses, setFixedExpenses }) {
 Object.assign(window, { Gastos });
 </script>
 <script type="text/babel">
+// ═══════════════════════════════════════════════════════════════
+// EMBUDO — kanban de prospectos (pre-venta) con arrastrar y soltar
+// ═══════════════════════════════════════════════════════════════
+const FUNNEL_STAGES = [
+  { id: 'sin-clasificar',       label: 'Sin clasificar',       color: '#8A8A8A' },
+  { id: 'nuevo-contacto',       label: 'Nuevo contacto',       color: '#6BA3E0' },
+  { id: 'cotizo',                label: 'Cotizó',                color: '#E8B547' },
+  { id: 'esperando-pago',       label: 'Esperando pago',       color: '#FF8A3D' },
+  { id: 'compro',                label: 'Compró',                color: '#7BC96F' },
+  { id: 'posventa',              label: 'Posventa',              color: '#B37BE0' },
+  { id: 'necesita-seguimiento', label: 'Necesita seguimiento', color: '#E63946' },
+];
+
+function timeAgo(iso) {
+  if (!iso) return '';
+  const diffMin = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (diffMin < 1) return 'ahora';
+  if (diffMin < 60) return `hace ${diffMin} min`;
+  const h = Math.floor(diffMin / 60);
+  if (h < 24) return `hace ${h} h`;
+  return `hace ${Math.floor(h / 24)} d`;
+}
+
+function Embudo({ prospects, setProspects, onConvert }) {
+  const [showNew, setShowNew] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [dragOverStage, setDragOverStage] = useState(null);
+
+  const addProspect = (data) => {
+    const now = new Date().toISOString();
+    setProspects(prev => [{ id: crypto.randomUUID().slice(0, 8), etapa: FUNNEL_STAGES[0].id, creado: now, actualizado: now, ...data }, ...prev]);
+    setShowNew(false);
+  };
+
+  const updateProspect = (id, patch) => {
+    setProspects(prev => prev.map(p => p.id === id ? { ...p, ...patch, actualizado: new Date().toISOString() } : p));
+  };
+
+  const deleteProspect = (id) => {
+    const p = prospects.find(x => x.id === id);
+    uiConfirm({ title: 'Eliminar prospecto', message: `Se quitará "${p?.nombre || ''}" del embudo. Esta acción no se puede deshacer.`, confirmLabel: 'Eliminar' })
+      .then(ok => { if (ok) { setProspects(prev => prev.filter(x => x.id !== id)); setEditingId(null); } });
+  };
+
+  const moveTo = (id, etapaId) => {
+    const p = prospects.find(x => x.id === id);
+    if (!p || p.etapa === etapaId) return;
+    updateProspect(id, { etapa: etapaId });
+    if (etapaId === 'compro') {
+      uiConfirm({ title: 'Prospecto convertido', message: `${p.nombre} pasó a "Compró". ¿Abrir Nueva Venta con sus datos para registrar el pedido?`, confirmLabel: 'Abrir Nueva Venta', cancelLabel: 'Ahora no', danger: false })
+        .then(ok => { if (ok) onConvert(p); });
+    }
+  };
+
+  const totalProspects = prospects.length;
+
+  return (
+    <div>
+      <div className="page-head">
+        <div>
+          <div className="page-title">Embudo</div>
+          <div className="page-desc">Prospectos en proceso · arrastrá las tarjetas entre etapas para dar seguimiento hasta cerrar la venta.</div>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div className="chip">PROSPECTOS <span className="v mono">{totalProspects}</span></div>
+          <button className="btn primary" onClick={() => setShowNew(true)}><Icon name="plus" size={12} /> Nuevo prospecto</button>
+        </div>
+      </div>
+
+      {showNew && <ProspectoForm onSave={addProspect} onCancel={() => setShowNew(false)} />}
+
+      <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 14 }}>
+        {FUNNEL_STAGES.map(stage => {
+          const items = prospects.filter(p => p.etapa === stage.id).sort((a, b) => (b.actualizado || '').localeCompare(a.actualizado || ''));
+          const isOver = dragOverStage === stage.id;
+          return (
+            <div key={stage.id}
+              onDragOver={e => { e.preventDefault(); setDragOverStage(stage.id); }}
+              onDragLeave={() => setDragOverStage(s => s === stage.id ? null : s)}
+              onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if (id) moveTo(id, stage.id); setDragOverStage(null); }}
+              style={{
+                minWidth: 264, width: 264, flexShrink: 0,
+                background: isOver ? '#141414' : 'var(--surface)',
+                border: `1px solid ${isOver ? stage.color : 'var(--line)'}`,
+                borderRadius: 'var(--r-lg)', display: 'flex', flexDirection: 'column',
+                maxHeight: 'calc(100vh - 280px)', transition: 'border-color .12s, background .12s',
+              }}>
+              <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: stage.color, flexShrink: 0 }} />
+                <span style={{ fontWeight: 600, fontSize: 13 }}>{stage.label}</span>
+                <span className="mono" style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--dim)' }}>{items.length}</span>
+              </div>
+              <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', flex: 1, minHeight: 60 }}>
+                {items.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '18px 8px', color: 'var(--dim)', fontSize: 11 }}>Sin prospectos</div>
+                )}
+                {items.map(p => (
+                  <div key={p.id}
+                    draggable
+                    onDragStart={e => { e.dataTransfer.setData('text/plain', p.id); e.dataTransfer.effectAllowed = 'move'; }}
+                    onClick={() => setEditingId(p.id)}
+                    style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '10px 12px', cursor: 'grab' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
+                      <span style={{ fontWeight: 600, fontSize: 13 }}>{p.nombre}</span>
+                      <span className="mono" style={{ fontSize: 10, color: 'var(--dim)', flexShrink: 0 }}>{timeAgo(p.actualizado)}</span>
+                    </div>
+                    {p.nota && (
+                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nota}</div>
+                    )}
+                    <span className="chip" style={{ marginTop: 8, fontSize: 9, padding: '3px 8px' }}>{p.canal}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {editingId && (() => {
+        const p = prospects.find(x => x.id === editingId);
+        if (!p) return null;
+        return (
+          <ProspectoModal
+            prospect={p}
+            onClose={() => setEditingId(null)}
+            onSave={patch => updateProspect(p.id, patch)}
+            onDelete={() => deleteProspect(p.id)}
+            onConvert={() => { onConvert(p); setEditingId(null); }}
+          />
+        );
+      })()}
+    </div>
+  );
+}
+
+function ProspectoForm({ onSave, onCancel }) {
+  const [f, setF] = useState({ nombre: '', telefono: '', canal: 'WhatsApp', nota: '' });
+  const canSave = f.nombre.trim() && f.telefono.trim();
+  const fieldStyle = { background: '#0B0B0B', border: '1px solid var(--line)', padding: '10px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'inherit', borderRadius: 8 };
+  const labelStyle = { fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 5 };
+
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--accent)', borderRadius: 'var(--r-lg)', padding: 20, marginBottom: 20 }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15, marginBottom: 16 }}>Nuevo prospecto</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px', gap: 14, marginBottom: 14 }}>
+        <div><label style={labelStyle}>Nombre *</label><input style={fieldStyle} value={f.nombre} onChange={e => setF(x => ({ ...x, nombre: e.target.value }))} onKeyDown={e => e.key === 'Enter' && canSave && onSave(f)} /></div>
+        <div><label style={labelStyle}>Teléfono *</label><input style={fieldStyle} value={f.telefono} onChange={e => setF(x => ({ ...x, telefono: e.target.value }))} onKeyDown={e => e.key === 'Enter' && canSave && onSave(f)} /></div>
+        <div><label style={labelStyle}>Canal</label><select style={fieldStyle} value={f.canal} onChange={e => setF(x => ({ ...x, canal: e.target.value }))}>{CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <label style={labelStyle}>Nota</label>
+        <textarea style={{ ...fieldStyle, minHeight: 60, resize: 'vertical' }} value={f.nota} onChange={e => setF(x => ({ ...x, nota: e.target.value }))} placeholder="Ej. Preguntó por talla L, esperando confirmación de pago…" />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn primary" disabled={!canSave} onClick={() => onSave(f)}><Icon name="plus" size={12} /> Agregar</button>
+        <button className="btn ghost" onClick={onCancel}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+function ProspectoModal({ prospect, onClose, onSave, onDelete, onConvert }) {
+  const [f, setF] = useState({ nombre: prospect.nombre, telefono: prospect.telefono, canal: prospect.canal, etapa: prospect.etapa, nota: prospect.nota || '' });
+  const fieldStyle = { background: '#0B0B0B', border: '1px solid var(--line)', padding: '10px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'inherit', borderRadius: 8 };
+  const labelStyle = { fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 5 };
+  const save = () => { onSave(f); onClose(); };
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card)', border: '1px solid var(--line-2)', borderRadius: 18, width: '100%', maxWidth: 420, padding: 24 }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 17, marginBottom: 18 }}>{prospect.nombre}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Nombre</label><input style={fieldStyle} value={f.nombre} onChange={e => setF(x => ({ ...x, nombre: e.target.value }))} /></div>
+          <div><label style={labelStyle}>Teléfono</label><input style={fieldStyle} value={f.telefono} onChange={e => setF(x => ({ ...x, telefono: e.target.value }))} /></div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+          <div><label style={labelStyle}>Canal</label><select style={fieldStyle} value={f.canal} onChange={e => setF(x => ({ ...x, canal: e.target.value }))}>{CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+          <div><label style={labelStyle}>Etapa</label><select style={fieldStyle} value={f.etapa} onChange={e => setF(x => ({ ...x, etapa: e.target.value }))}>{FUNNEL_STAGES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}</select></div>
+        </div>
+        <div style={{ marginBottom: 18 }}>
+          <label style={labelStyle}>Nota</label>
+          <textarea style={{ ...fieldStyle, minHeight: 70, resize: 'vertical' }} value={f.nota} onChange={e => setF(x => ({ ...x, nota: e.target.value }))} />
+        </div>
+        {prospect.etapa !== 'compro' && (
+          <button className="btn sm" style={{ width: '100%', marginBottom: 10, background: 'var(--ok)', color: '#0A0A0A', fontWeight: 700, border: 'none' }} onClick={onConvert}>
+            → Convertir en venta
+          </button>
+        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn primary" onClick={save}>Guardar</button>
+          <button className="btn ghost" onClick={onClose}>Cerrar</button>
+          <button className="btn sm ghost" style={{ marginLeft: 'auto', color: 'var(--accent)' }} onClick={onDelete}><Icon name="trash" size={11} /></button>
+        </div>
+      </div>
+    </div>
+  );
+}
+Object.assign(window, { Embudo });
+</script>
+<script type="text/babel">
 // ── Acceso exclusivo ──────────────────────────────────────────
 // El PIN ya NO está en el código fuente.
 // Se guarda en Firestore → data/auth → { pin: "XXXX" }
@@ -5568,6 +5770,9 @@ function App({ onLogout }) {
   // Gastos: publicidad (registros con fecha) + fijos mensuales (recurrentes)
   const [adSpend, setAdSpend] = useS([]);
   const [fixedExpenses, setFixedExpenses] = useS([]);
+  // Embudo: prospectos en seguimiento + datos de cliente a precargar en Nueva Venta al convertir
+  const [prospects, setProspects] = useS([]);
+  const [prefillCliente, setPrefillCliente] = useS(null);
   const [tweaksOpen, setTweaksOpen] = useS(false);
   const [tweaks, setTweaks] = useS(window.__TWEAKS__);
   const [gSearch, setGSearch] = useS('');
@@ -5844,9 +6049,10 @@ function App({ onLogout }) {
         col.doc('config').get(),
         col.doc('inventory').get(),
         col.doc('expenses').get(),
+        col.doc('prospects').get(),
       ]),
       timeout,
-    ]).then(([oDoc, cDoc, cfDoc, invDoc, exDoc]) => {
+    ]).then(([oDoc, cDoc, cfDoc, invDoc, exDoc, prDoc]) => {
       if (oDoc.exists && oDoc.data().items?.length) setOrders(oDoc.data().items);
       if (cDoc.exists && cDoc.data().items?.length) setClients(cDoc.data().items);
       if (cfDoc.exists && cfDoc.data().payConfig?.length) {
@@ -5858,6 +6064,7 @@ function App({ onLogout }) {
         if (exDoc.data().adSpend?.length)       setAdSpend(exDoc.data().adSpend);
         if (exDoc.data().fixedExpenses?.length) setFixedExpenses(exDoc.data().fixedExpenses);
       }
+      if (prDoc.exists && prDoc.data().items?.length) setProspects(prDoc.data().items);
       if (invDoc.exists) {
         const d = invDoc.data();
         if (d.prendas?.length)  setPrendas(d.prendas);
@@ -5921,7 +6128,7 @@ function App({ onLogout }) {
   // ya traen exactamente lo que Firebase acaba de mandar — guardarlos de
   // nuevo es un round-trip inútil que además compite con el límite de
   // escrituras por segundo de Firestore. Se salta una sola vez por key.
-  const skipInitialSave = React.useRef({ orders: true, clients: true, config: true, expenses: true });
+  const skipInitialSave = React.useRef({ orders: true, clients: true, config: true, expenses: true, prospects: true });
   const fbSaveIfChanged = (key, data) => {
     if (skipInitialSave.current[key]) { skipInitialSave.current[key] = false; return; }
     fbSave(key, data);
@@ -5930,6 +6137,7 @@ function App({ onLogout }) {
   useE(() => { if (fbReady) fbSaveIfChanged('clients', { items: clients }); },   [clients, fbReady]);
   useE(() => { if (fbReady) fbSaveIfChanged('config',  { payConfig, designCats, stockThreshold }); }, [payConfig, designCats, stockThreshold, fbReady]);
   useE(() => { if (fbReady) fbSaveIfChanged('expenses', { adSpend, fixedExpenses }); }, [adSpend, fixedExpenses, fbReady]);
+  useE(() => { if (fbReady) fbSaveIfChanged('prospects', { items: prospects }); }, [prospects, fbReady]);
   // Inventory saves are now EXPLICIT (scheduleInvSave) — never triggered reactively
   // to avoid overwriting Firebase with stale defaults during page load.
 
@@ -6131,14 +6339,30 @@ function App({ onLogout }) {
     showActionToast(`Pedido #${n} eliminado · stock restaurado`, 'Deshacer', () => restoreDeletedOrder(order));
   };
 
+  // Convierte un prospecto del Embudo en el arranque de un pedido real:
+  // precarga sus datos en Nueva Venta (fuerza remount vía orderKey para
+  // que el prefill se aplique) y navega ahí.
+  const handleConvertProspect = (p) => {
+    setPrefillCliente({
+      nombre: p.nombre || '',
+      contacto: p.telefono || '',
+      ciudad: '',
+      canal: CHANNELS.includes(p.canal) ? p.canal : 'Instagram',
+      direccion: '',
+    });
+    setOrderKey(k => k + 1);
+    setRoute('nueva');
+  };
+
   const modules = [
     { id: 'nueva',      label: 'Nueva Venta',   num: '01', icon: 'plus' },
-    { id: 'ventas',     label: 'Ventas',        num: '02', icon: 'list' },
-    { id: 'clientes',   label: 'Clientes',      num: '03', icon: 'user' },
-    { id: 'inventario', label: 'Inventario',    num: '04', icon: 'box' },
-    { id: 'metricas',   label: 'Métricas',      num: '05', icon: 'chart' },
-    { id: 'gastos',     label: 'Gastos',        num: '06', icon: 'money' },
-    { id: 'config',     label: 'Configuración', num: '07', icon: 'settings' },
+    { id: 'embudo',     label: 'Embudo',        num: '02', icon: 'filter' },
+    { id: 'ventas',     label: 'Ventas',        num: '03', icon: 'list' },
+    { id: 'clientes',   label: 'Clientes',      num: '04', icon: 'user' },
+    { id: 'inventario', label: 'Inventario',    num: '05', icon: 'box' },
+    { id: 'metricas',   label: 'Métricas',      num: '06', icon: 'chart' },
+    { id: 'gastos',     label: 'Gastos',        num: '07', icon: 'money' },
+    { id: 'config',     label: 'Configuración', num: '08', icon: 'settings' },
   ];
 
   const currentModule = modules.find(m => m.id === route);
@@ -6308,7 +6532,8 @@ function App({ onLogout }) {
         </div>
 
         <div className="content">
-          {route === 'nueva'      && <NuevaVenta key={orderKey} onOrderCreated={(o) => handleOrderCreated(o)} onReset={() => { setOrderKey(k => k + 1); setRoute('nueva'); }} nextOrderNumber={nextOrderNumber} clients={clients} payConfig={payConfig} onClientCreated={(c) => setClients(prev => prev.find(x => x.phone === c.phone) ? prev : [c, ...prev])} prendas={prendas} designs={designs} dtfStock={dtfStock} stock={stock} />}
+          {route === 'nueva'      && <NuevaVenta key={orderKey} onOrderCreated={(o) => handleOrderCreated(o)} onReset={() => { setOrderKey(k => k + 1); setRoute('nueva'); }} nextOrderNumber={nextOrderNumber} clients={clients} payConfig={payConfig} onClientCreated={(c) => setClients(prev => prev.find(x => x.phone === c.phone) ? prev : [c, ...prev])} prendas={prendas} designs={designs} dtfStock={dtfStock} stock={stock} initialCliente={prefillCliente} onPrefillConsumed={() => setPrefillCliente(null)} />}
+          {route === 'embudo'     && <Embudo prospects={prospects} setProspects={setProspects} onConvert={handleConvertProspect} />}
           {route === 'ventas'     && <Ventas orders={orders} onOrderUpdate={handleOrderUpdate} onOrderDelete={handleDeleteOrder} payConfig={payConfig} designs={designs} prendas={prendas} />}
           {route === 'clientes'   && <Clientes clients={clients} setClients={setClients} orders={orders} payConfig={payConfig} />}
           {route === 'inventario' && <Inventario

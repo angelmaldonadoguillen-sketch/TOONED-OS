@@ -6289,8 +6289,13 @@ function App({ onLogout }) {
     const gananciaMes = gananciaBruta - gastosMes.total;
     const stockBajo = Object.values(stock).filter(v => v > 0 && v <= stockThreshold).length;
     const boxfulPend = orders.filter(o => o.payStatus === 'boxful-pending' && !['rebotado','perdido'].includes(o.estado)).length;
-    return { mesLabel, ventaMes, gananciaMes, stockBajo, boxfulPend };
-  }, [orders, stock, stockThreshold, payConfig, adSpend, fixedExpenses]);
+    // Pre-venta total (mismo cálculo que en Embudo): venta confirmada del mes
+    // (sin rebotados/perdidos) + proyección de los prospectos esperando pago.
+    const ventaConfirmadaMes = monthOrders.filter(o => !['rebotado','perdido'].includes(o.estado)).reduce((a, o) => a + (o.total || 0), 0);
+    const proyeccionEsperandoPago = (prospects || []).filter(p => p.etapa === 'esperando-pago').reduce((a, p) => a + (Number(p.proyeccion) || 0), 0);
+    const preVentaTotal = ventaConfirmadaMes + proyeccionEsperandoPago;
+    return { mesLabel, ventaMes, gananciaMes, stockBajo, boxfulPend, preVentaTotal };
+  }, [orders, stock, stockThreshold, payConfig, adSpend, fixedExpenses, prospects]);
 
   const handleOrderCreated = (order) => {
     // Stamp initial estado log
@@ -6594,6 +6599,7 @@ function App({ onLogout }) {
           <span className="item">Próx. orden <span className="v">#{nextOrderNumber}</span></span>
           <span className="item">{tickerStats.mesLabel} · Venta <span className="v">{L(tickerStats.ventaMes)}</span></span>
           <span className="item">Ganancia <span className="v" style={{color: tickerStats.gananciaMes >= 0 ? 'var(--ok)' : 'var(--accent)'}}>{L(tickerStats.gananciaMes)}</span></span>
+          <span className="item">Pre-venta total <span className="v" style={{color: 'var(--accent)'}}>{L(tickerStats.preVentaTotal)}</span></span>
           <span className="item">Stock bajo <span className="v" style={{color: tickerStats.stockBajo > 0 ? 'var(--warn)' : 'var(--muted)'}}>{tickerStats.stockBajo} SKU</span></span>
           <span className="item">Boxful pend. <span className="v" style={{color: tickerStats.boxfulPend > 0 ? 'var(--warn)' : 'var(--muted)'}}>{tickerStats.boxfulPend}</span></span>
         </div>

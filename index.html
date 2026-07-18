@@ -4318,10 +4318,9 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
                 }}>{designTotal > 0 ? `${designTotal} UDS` : '0 UDS'}</div>
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '12px 14px', background: 'linear-gradient(transparent, rgba(0,0,0,0.85))', zIndex: 2 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, letterSpacing: '-0.01em' }}>{d.name}</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13.5, letterSpacing: '-0.005em' }}>{d.name}</div>
                     {isAgotado && (
-                      <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 9, letterSpacing: '0.08em', color: 'var(--accent)', border: '1px solid rgba(230,57,70,.4)', borderRadius: 'var(--r-pill)', padding: '3px 9px', textTransform: 'uppercase' }}>
-                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)' }} />
+                      <span style={{ flexShrink: 0, fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 9, letterSpacing: '0.08em', color: '#fff', background: 'var(--accent)', borderRadius: 'var(--r-pill)', padding: '3px 10px', textTransform: 'uppercase' }}>
                         Agotado
                       </span>
                     )}

@@ -5884,16 +5884,52 @@ function App({ onLogout }) {
   useE(() => { loadFromFirebase(); }, []);
 
   // ── Firebase: guardar con debounce al cambiar datos ──
+  // pendingSaves guarda el último payload no confirmado por key, para poder
+  // forzar el guardado (flush) si el usuario cierra/oculta la pestaña antes
+  // de que venza el debounce.
+  const pendingSaves = React.useRef({});
+  const flushFbSaves = () => {
+    Object.keys(pendingSaves.current).forEach(key => {
+      const data = pendingSaves.current[key];
+      if (data === undefined) return;
+      clearTimeout(saveTimers.current[key]);
+      pendingSaves.current[key] = undefined;
+      window.db.collection('data').doc(key).set(data).catch(e => console.warn('FB flush:', key, e));
+    });
+  };
   const fbSave = (key, data) => {
+    pendingSaves.current[key] = data;
     clearTimeout(saveTimers.current[key]);
     saveTimers.current[key] = setTimeout(() => {
+      pendingSaves.current[key] = undefined;
       window.db.collection('data').doc(key).set(data).catch(e => console.warn('FB save:', e));
-    }, 1500);
+    }, 3000);
   };
-  useE(() => { if (fbReady) fbSave('orders',  { items: orders }); },    [orders,  fbReady]);
-  useE(() => { if (fbReady) fbSave('clients', { items: clients }); },   [clients, fbReady]);
-  useE(() => { if (fbReady) fbSave('config',  { payConfig, designCats, stockThreshold }); }, [payConfig, designCats, stockThreshold, fbReady]);
-  useE(() => { if (fbReady) fbSave('expenses', { adSpend, fixedExpenses }); }, [adSpend, fixedExpenses, fbReady]);
+  React.useEffect(() => {
+    const onHide = () => { flushFbSaves(); flushInvSave.current(); };
+    const onVisChange = () => { if (document.visibilityState === 'hidden') onHide(); };
+    window.addEventListener('beforeunload', onHide);
+    window.addEventListener('pagehide', onHide);
+    document.addEventListener('visibilitychange', onVisChange);
+    return () => {
+      window.removeEventListener('beforeunload', onHide);
+      window.removeEventListener('pagehide', onHide);
+      document.removeEventListener('visibilitychange', onVisChange);
+    };
+  }, []);
+  // skipInitialSave: al pasar fbReady a true, orders/clients/config/expenses
+  // ya traen exactamente lo que Firebase acaba de mandar — guardarlos de
+  // nuevo es un round-trip inútil que además compite con el límite de
+  // escrituras por segundo de Firestore. Se salta una sola vez por key.
+  const skipInitialSave = React.useRef({ orders: true, clients: true, config: true, expenses: true });
+  const fbSaveIfChanged = (key, data) => {
+    if (skipInitialSave.current[key]) { skipInitialSave.current[key] = false; return; }
+    fbSave(key, data);
+  };
+  useE(() => { if (fbReady) fbSaveIfChanged('orders',  { items: orders }); },    [orders,  fbReady]);
+  useE(() => { if (fbReady) fbSaveIfChanged('clients', { items: clients }); },   [clients, fbReady]);
+  useE(() => { if (fbReady) fbSaveIfChanged('config',  { payConfig, designCats, stockThreshold }); }, [payConfig, designCats, stockThreshold, fbReady]);
+  useE(() => { if (fbReady) fbSaveIfChanged('expenses', { adSpend, fixedExpenses }); }, [adSpend, fixedExpenses, fbReady]);
   // Inventory saves are now EXPLICIT (scheduleInvSave) — never triggered reactively
   // to avoid overwriting Firebase with stale defaults during page load.
 

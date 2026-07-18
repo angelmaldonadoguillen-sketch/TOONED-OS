@@ -5240,14 +5240,14 @@ function timeAgo(iso) {
   return `hace ${Math.floor(h / 24)} d`;
 }
 
-function Embudo({ prospects, setProspects, onConvert }) {
+function Embudo({ prospects, setProspects, clients = [], orders = [], onConvert }) {
   const [showNew, setShowNew] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [dragOverStage, setDragOverStage] = useState(null);
 
   const addProspect = (data) => {
     const now = new Date().toISOString();
-    setProspects(prev => [{ id: crypto.randomUUID().slice(0, 8), etapa: FUNNEL_STAGES[0].id, creado: now, actualizado: now, ...data }, ...prev]);
+    setProspects(prev => [{ id: crypto.randomUUID().slice(0, 8), etapa: FUNNEL_STAGES[0].id, creado: now, actualizado: now, ...data, proyeccion: Number(data.proyeccion) || 0 }, ...prev]);
     setShowNew(false);
   };
 
@@ -5273,6 +5273,20 @@ function Embudo({ prospects, setProspects, onConvert }) {
 
   const totalProspects = prospects.length;
 
+  // Motivación: venta confirmada del mes + proyección de los prospectos que
+  // ya solo están esperando que se capture el pago (lo más cerca de cerrar).
+  const now = new Date();
+  const ventaConfirmadaMes = React.useMemo(() => {
+    return (orders || [])
+      .filter(o => !['rebotado', 'perdido'].includes(o.estado))
+      .filter(o => { const d = new Date(o.fecha); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); })
+      .reduce((a, o) => a + (o.total || 0), 0);
+  }, [orders]);
+  const proyeccionEsperandoPago = React.useMemo(() => {
+    return prospects.filter(p => p.etapa === 'esperando-pago').reduce((a, p) => a + (Number(p.proyeccion) || 0), 0);
+  }, [prospects]);
+  const preVentaTotal = ventaConfirmadaMes + proyeccionEsperandoPago;
+
   return (
     <div>
       <div className="page-head">
@@ -5286,7 +5300,20 @@ function Embudo({ prospects, setProspects, onConvert }) {
         </div>
       </div>
 
-      {showNew && <ProspectoForm onSave={addProspect} onCancel={() => setShowNew(false)} />}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: 'var(--line)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', overflow: 'hidden', marginBottom: 28 }}>
+        {[
+          { label: 'Venta confirmada (mes)', value: L(ventaConfirmadaMes), color: 'var(--text)' },
+          { label: 'Proyección esperando pago', value: L(proyeccionEsperandoPago), color: 'var(--warn)' },
+          { label: 'Pre-venta total', value: L(preVentaTotal), color: 'var(--accent)' },
+        ].map(({ label, value, color }) => (
+          <div key={label} style={{ background: 'var(--card)', padding: '20px 20px 24px' }}>
+            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>{label}</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 30, letterSpacing: '-0.02em', color }}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      {showNew && <ProspectoForm onSave={addProspect} onCancel={() => setShowNew(false)} clients={clients} />}
 
       <div className="themed-scroll" style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 14 }}>
         {FUNNEL_STAGES.map(stage => {
@@ -5326,7 +5353,10 @@ function Embudo({ prospects, setProspects, onConvert }) {
                     {p.nota && (
                       <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nota}</div>
                     )}
-                    <span className="chip" style={{ marginTop: 8, fontSize: 9, padding: '3px 8px' }}>{p.canal}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                      <span className="chip" style={{ fontSize: 9, padding: '3px 8px' }}>{p.canal}</span>
+                      {(Number(p.proyeccion) || 0) > 0 && <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--ok)' }}>{L(p.proyeccion)}</span>}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -5352,19 +5382,61 @@ function Embudo({ prospects, setProspects, onConvert }) {
   );
 }
 
-function ProspectoForm({ onSave, onCancel }) {
-  const [f, setF] = useState({ nombre: '', telefono: '', canal: 'WhatsApp', nota: '' });
+function ProspectoForm({ onSave, onCancel, clients = [] }) {
+  const [f, setF] = useState({ nombre: '', telefono: '', canal: 'WhatsApp', nota: '', proyeccion: '' });
+  const [showMatches, setShowMatches] = useState(false);
   const canSave = f.nombre.trim() && f.telefono.trim();
   const fieldStyle = { background: '#0B0B0B', border: '1px solid var(--line)', padding: '10px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'inherit', borderRadius: 8 };
   const labelStyle = { fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 5 };
 
+  // Predicción de contacto: si el teléfono coincide con un cliente ya registrado
+  const norm = (s) => (s || '').replace(/\D/g, '');
+  const matches = f.telefono && norm(f.telefono).length >= 3
+    ? clients.filter(c => norm(c.phone).includes(norm(f.telefono))).slice(0, 5)
+    : [];
+  const exact = clients.find(c => norm(c.phone) === norm(f.telefono));
+  const applyClient = (c) => {
+    setF(x => ({ ...x, nombre: c.nombre, telefono: c.phone, canal: CHANNELS.includes(c.canal) ? c.canal : x.canal }));
+    setShowMatches(false);
+  };
+
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--accent)', borderRadius: 'var(--r-lg)', padding: 20, marginBottom: 20 }}>
       <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15, marginBottom: 16 }}>Nuevo prospecto</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px', gap: 14, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 170px 140px 140px', gap: 14, marginBottom: 14 }}>
         <div><label style={labelStyle}>Nombre *</label><input style={fieldStyle} value={f.nombre} onChange={e => setF(x => ({ ...x, nombre: e.target.value }))} onKeyDown={e => e.key === 'Enter' && canSave && onSave(f)} /></div>
-        <div><label style={labelStyle}>Teléfono *</label><input style={fieldStyle} value={f.telefono} onChange={e => setF(x => ({ ...x, telefono: e.target.value }))} onKeyDown={e => e.key === 'Enter' && canSave && onSave(f)} /></div>
+        <div style={{ position: 'relative' }}>
+          <label style={labelStyle}>
+            Teléfono *
+            {exact && <span style={{ marginLeft: 6, fontSize: 8, color: 'var(--accent)', letterSpacing: '0.08em' }}>● EXISTENTE</span>}
+          </label>
+          <input
+            style={fieldStyle}
+            value={f.telefono}
+            onFocus={() => setShowMatches(true)}
+            onBlur={() => setTimeout(() => setShowMatches(false), 180)}
+            onChange={e => { setF(x => ({ ...x, telefono: e.target.value })); setShowMatches(true); }}
+            onKeyDown={e => e.key === 'Enter' && canSave && onSave(f)}
+          />
+          {showMatches && matches.length > 0 && !exact && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#0F0F0F', border: '1px solid var(--accent)', borderRadius: 8, zIndex: 50, marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 12px 32px rgba(0,0,0,.6)' }}>
+              <div className="mono" style={{ fontSize: 9, letterSpacing: '0.1em', color: 'var(--accent)', padding: '6px 10px', borderBottom: '1px solid var(--line)', textTransform: 'uppercase' }}>
+                {matches.length} {matches.length === 1 ? 'coincidencia' : 'coincidencias'} · clic para autocompletar
+              </div>
+              {matches.map(m => (
+                <div key={m.phone} onMouseDown={() => applyClient(m)}
+                  style={{ padding: '8px 10px', borderBottom: '1px solid var(--line)', cursor: 'pointer' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#1C1C1C'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div className="mono" style={{ fontSize: 11, fontWeight: 700 }}>{m.phone}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{m.nombre} · {m.ciudad}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <div><label style={labelStyle}>Canal</label><select style={fieldStyle} value={f.canal} onChange={e => setF(x => ({ ...x, canal: e.target.value }))}>{CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+        <div><label style={labelStyle}>Proyección (L)</label><input type="number" min="0" style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }} placeholder="0" value={f.proyeccion} onChange={e => setF(x => ({ ...x, proyeccion: e.target.value }))} onKeyDown={e => e.key === 'Enter' && canSave && onSave(f)} /></div>
       </div>
       <div style={{ marginBottom: 16 }}>
         <label style={labelStyle}>Nota</label>
@@ -5379,10 +5451,10 @@ function ProspectoForm({ onSave, onCancel }) {
 }
 
 function ProspectoModal({ prospect, onClose, onSave, onDelete, onConvert }) {
-  const [f, setF] = useState({ nombre: prospect.nombre, telefono: prospect.telefono, canal: prospect.canal, etapa: prospect.etapa, nota: prospect.nota || '' });
+  const [f, setF] = useState({ nombre: prospect.nombre, telefono: prospect.telefono, canal: prospect.canal, etapa: prospect.etapa, nota: prospect.nota || '', proyeccion: prospect.proyeccion || '' });
   const fieldStyle = { background: '#0B0B0B', border: '1px solid var(--line)', padding: '10px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'inherit', borderRadius: 8 };
   const labelStyle = { fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 5 };
-  const save = () => { onSave(f); onClose(); };
+  const save = () => { onSave({ ...f, proyeccion: Number(f.proyeccion) || 0 }); onClose(); };
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
@@ -5395,6 +5467,10 @@ function ProspectoModal({ prospect, onClose, onSave, onDelete, onConvert }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
           <div><label style={labelStyle}>Canal</label><select style={fieldStyle} value={f.canal} onChange={e => setF(x => ({ ...x, canal: e.target.value }))}>{CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
           <div><label style={labelStyle}>Etapa</label><select style={fieldStyle} value={f.etapa} onChange={e => setF(x => ({ ...x, etapa: e.target.value }))}>{FUNNEL_STAGES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}</select></div>
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={labelStyle}>Proyección de compra (L)</label>
+          <input type="number" min="0" style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }} placeholder="0" value={f.proyeccion} onChange={e => setF(x => ({ ...x, proyeccion: e.target.value }))} />
         </div>
         <div style={{ marginBottom: 18 }}>
           <label style={labelStyle}>Nota</label>
@@ -6540,7 +6616,7 @@ function App({ onLogout }) {
 
         <div className="content">
           {route === 'nueva'      && <NuevaVenta key={orderKey} onOrderCreated={(o) => handleOrderCreated(o)} onReset={() => { setOrderKey(k => k + 1); setRoute('nueva'); }} nextOrderNumber={nextOrderNumber} clients={clients} payConfig={payConfig} onClientCreated={(c) => setClients(prev => prev.find(x => x.phone === c.phone) ? prev : [c, ...prev])} prendas={prendas} designs={designs} dtfStock={dtfStock} stock={stock} initialCliente={prefillCliente} onPrefillConsumed={() => setPrefillCliente(null)} />}
-          {route === 'embudo'     && <Embudo prospects={prospects} setProspects={setProspects} onConvert={handleConvertProspect} />}
+          {route === 'embudo'     && <Embudo prospects={prospects} setProspects={setProspects} clients={clients} orders={orders} onConvert={handleConvertProspect} />}
           {route === 'ventas'     && <Ventas orders={orders} onOrderUpdate={handleOrderUpdate} onOrderDelete={handleDeleteOrder} payConfig={payConfig} designs={designs} prendas={prendas} />}
           {route === 'clientes'   && <Clientes clients={clients} setClients={setClients} orders={orders} payConfig={payConfig} />}
           {route === 'inventario' && <Inventario

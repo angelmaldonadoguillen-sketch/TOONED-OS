@@ -3405,7 +3405,7 @@ function seedStock() {
   return s;
 }
 
-function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStock, setStockVal, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow, loadCloudThumbs, stockMovLog = [], stockThreshold = 3, invDirty, commitInv, cancelInv, invSaving }) {
+function Inventario({ prendas, setPrendas, removePrenda, dtfSizes, setDtfSizes, stock, addStock, setStockVal, dtfStock, setDtfStock, designs, setDesigns, designCats, setDesignCats, setOrders, saveInvNow, loadCloudThumbs, stockMovLog = [], stockThreshold = 3, invDirty, commitInv, cancelInv, invSaving }) {
   const [tab, setTab] = useState('prendas');
   const [confirmCancel, setConfirmCancel] = useState(false);
 
@@ -3485,7 +3485,7 @@ function Inventario({ prendas, setPrendas, dtfSizes, setDtfSizes, stock, addStoc
       </div>
 
 
-      {tab === 'prendas' && <PrendasStockTab prendas={prendas} setPrendas={setPrendas} stock={stock} addStock={addStock} setStockVal={setStockVal} stockThreshold={stockThreshold} />}
+      {tab === 'prendas' && <PrendasStockTab prendas={prendas} setPrendas={setPrendas} removePrenda={removePrenda} stock={stock} addStock={addStock} setStockVal={setStockVal} stockThreshold={stockThreshold} />}
       {tab === 'disenos' && <DisenosTab dtfSizes={dtfSizes} setDtfSizes={setDtfSizes} dtfStock={dtfStock} setDtfStock={setDtfStock} designs={designs} setDesigns={setDesigns} designCats={designCats} setDesignCats={setDesignCats} setOrders={setOrders} saveInvNow={saveInvNow} loadCloudThumbs={loadCloudThumbs} />}
       {tab === 'movimientos' && <MovimientosTab log={stockMovLog} />}
     </div>
@@ -3586,7 +3586,7 @@ const BASE_COLORS = [
   { id: 'cafe',    name: 'Café',          hex: '#6B4226', border: '#4A2D18' },
 ];
 
-function PrendasStockTab({ prendas, setPrendas, stock, addStock, setStockVal, stockThreshold = 3 }) {
+function PrendasStockTab({ prendas, setPrendas, removePrenda, stock, addStock, setStockVal, stockThreshold = 3 }) {
   const lowThreshold = stockThreshold;
   const [editing, setEditing] = useState(null);
   const [editName, setEditName] = useState({});
@@ -3607,7 +3607,7 @@ function PrendasStockTab({ prendas, setPrendas, stock, addStock, setStockVal, st
 
   const deletePrenda = (id) => {
     uiConfirm({ title: 'Eliminar categoría', message: 'Se borrará también todo su stock. Esta acción no se puede deshacer.', confirmLabel: 'Eliminar' })
-      .then(ok => { if (ok) setPrendas(prev => prev.filter(p => p.id !== id)); });
+      .then(ok => { if (ok) removePrenda(id); });
   };
 
   const TALLAS_BASE = ['XS','S','M','L','XL','XXL','ÚNICA'];
@@ -6121,6 +6121,21 @@ function App({ onLogout }) {
     setStock(prev => ({ ...prev, [key]: Math.max(0, val) }));
     markInvDirty();
   };
+  // Delete a prenda category AND purge its stock keys (fixes the confirm dialog's
+  // "se borrará también todo su stock" promise, which previously only removed the category)
+  const removePrenda = (id) => {
+    setStock(prev => {
+      const next = { ...prev };
+      let removedTotal = 0;
+      Object.keys(next).forEach(k => {
+        if (k === id || k.startsWith(id + '-')) { removedTotal += next[k] || 0; delete next[k]; }
+      });
+      if (removedTotal) addMovLog('ajuste', null, id, -removedTotal, `Categoría eliminada: ${id}`);
+      return next;
+    });
+    setPrendas(prev => prev.filter(p => p.id !== id));
+    markInvDirty();
+  };
 
   // ── Firebase: cargar datos al iniciar ──
   const loadFromFirebase = React.useCallback(() => {
@@ -6632,6 +6647,7 @@ function App({ onLogout }) {
           {route === 'clientes'   && <Clientes clients={clients} setClients={setClients} orders={orders} payConfig={payConfig} />}
           {route === 'inventario' && <Inventario
               prendas={prendas}   setPrendas={(v)   => { setPrendas(v);   markInvDirty(); }}
+              removePrenda={removePrenda}
               dtfSizes={dtfSizes} setDtfSizes={(v)  => { setDtfSizes(v);  markInvDirty(); }}
               stock={stock}       addStock={addStock} setStockVal={setStockVal}
               dtfStock={dtfStock} setDtfStock={(v)  => { setDtfStock(v);  markInvDirty(); }}

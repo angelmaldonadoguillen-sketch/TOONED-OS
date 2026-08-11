@@ -27,6 +27,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script>
@@ -5499,63 +5500,56 @@ Object.assign(window, { Embudo });
 </script>
 <script type="text/babel">
 // ── Acceso exclusivo ──────────────────────────────────────────
-// El PIN ya NO está en el código fuente.
-// Se guarda en Firestore → data/auth → { pin: "XXXX" }
-// Para cambiarlo: Firebase Console → Firestore → data → auth → campo pin
+// Autenticación con Firebase Auth (email + contraseña), con las mismas
+// cuentas que FRAME Studio Manager. Las cuentas se administran en
+// Firebase Console → Authentication → Usuarios.
+//
+// El doc data/auth con el PIN quedó obsoleto y se puede borrar.
 // ──────────────────────────────────────────────────────────────
 
-function LoginScreen({ onAuth }) {
-  const [pin, setPin] = useS('');
-  const [error, setError] = useS(false);
-  const [shake, setShake] = useS(false);
-  const [authLoading, setAuthLoading] = useS(true);   // cargando PIN desde Firestore
-  const [authError, setAuthError] = useS(null);       // null = ok, string = mensaje de error
-  const [retries, setRetries] = useS(0);
-  const correctPin = React.useRef(null);              // PIN real, nunca expuesto en DOM
+// Mensajes de error de Firebase Auth en español
+const TOONED_AUTH_ERRORS = {
+  'auth/user-not-found':          'No existe una cuenta con ese email.',
+  'auth/wrong-password':          'Contraseña incorrecta.',
+  'auth/invalid-credential':      'Email o contraseña incorrectos.',
+  'auth/invalid-login-credentials':'Email o contraseña incorrectos.',
+  'auth/invalid-email':           'El email no tiene un formato válido.',
+  'auth/too-many-requests':       'Demasiados intentos. Esperá unos minutos.',
+  'auth/network-request-failed':  'Sin conexión. Verificá tu internet.',
+  'auth/user-disabled':           'Esta cuenta está deshabilitada.',
+  'auth/operation-not-allowed':   'Email/contraseña no está habilitado en Firebase.',
+};
 
-  // Obtener PIN de Firestore — con timeout de 10 s
-  useE(() => {
-    setAuthLoading(true);
-    setAuthError(null);
+function LoginScreen() {
+  // Antes: PIN de 4 dígitos guardado en texto plano en data/auth y comparado
+  // en el navegador. Eso no protegía nada — el PIN se leía con la misma
+  // petición pública que los datos que pretendía proteger, y los datos se
+  // podían leer directamente sin pasar por acá. Ahora es Firebase Auth, con
+  // las mismas cuentas que FRAME, y son las reglas de Firestore las que
+  // niegan el acceso a los datos hasta que hay sesión válida.
+  const [email, setEmail]       = useS('');
+  const [password, setPassword] = useS('');
+  const [error, setError]       = useS(false);
+  const [errorMsg, setErrorMsg] = useS('');
+  const [shake, setShake]       = useS(false);
+  const [submitting, setSubmitting] = useS(false);
 
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('timeout')), 10000)
-    );
-
-    Promise.race([
-      window.db.collection('data').doc('auth').get(),
-      timeout,
-    ])
-      .then(doc => {
-        if (doc.exists && doc.data().pin) {
-          correctPin.current = doc.data().pin;
-        } else {
-          const boot = ['2', '9', '1', '1'].join('');
-          correctPin.current = boot;
-          window.db.collection('data').doc('auth').set({ pin: boot });
-        }
-      })
-      .catch(e => {
-        let msg = 'No se pudo conectar con Firebase.';
-        if (e.message === 'timeout')            msg = 'Tiempo de espera agotado (10 s). Sin respuesta de Firebase.';
-        if (e.code === 'permission-denied')     msg = 'Acceso denegado — reglas de Firestore.';
-        if (e.code === 'unavailable')           msg = 'Firebase no disponible. Revisá tu internet.';
-        if (e.code === 'resource-exhausted')    msg = 'Cuota de Firebase agotada.';
-        setAuthError(msg);
-      })
-      .finally(() => setAuthLoading(false));
-  }, [retries]); // re-ejecuta cuando el usuario hace retry
-
-  const tryLogin = () => {
-    if (!correctPin.current) return;
-    if (pin === correctPin.current) {
-      sessionStorage.setItem('tooned-auth', '1');
-      onAuth();
-    } else {
+  const tryLogin = async () => {
+    if (!email.trim() || !password || submitting) return;
+    setSubmitting(true);
+    setError(false);
+    setErrorMsg('');
+    try {
+      await firebase.auth().signInWithEmailAndPassword(email.trim(), password);
+      // onAuthStateChanged en el root monta <App>. No se toca sessionStorage:
+      // la sesión la persiste el propio SDK de Firebase.
+    } catch (e) {
       setError(true);
+      setErrorMsg(TOONED_AUTH_ERRORS[e.code] || `Error inesperado (${e.code || e.message})`);
+      setPassword('');
       setShake(true);
-      setPin('');
       setTimeout(() => setShake(false), 500);
+      setSubmitting(false);
     }
   };
 
@@ -5572,86 +5566,75 @@ function LoginScreen({ onAuth }) {
           Sistema de gestión · Acceso privado
         </div>
 
-        {/* Estado: cargando */}
-        {authLoading && (
-          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '40px 28px' }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 20 }}>
-              Verificando acceso…
-            </div>
-            <div style={{ width: '100%', height: 3, background: '#1A1A1A', overflow: 'hidden', borderRadius: 99 }}>
-              <div style={{ height: '100%', background: 'var(--accent)', animation: 'loadBar 1.4s ease-in-out infinite' }} />
-            </div>
+        {/* Ingreso con la misma cuenta que FRAME */}
+        <div style={{
+          animation: shake ? 'shake 0.4s ease' : 'none',
+          background: 'var(--card)', border: `1px solid ${error ? 'var(--accent)' : 'var(--line)'}`,
+          borderRadius: 18, padding: '32px 28px',
+        }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 20 }}>
+            Ingresá con tu cuenta
           </div>
-        )}
 
-        {/* Estado: error de conexión */}
-        {!authLoading && authError && (
-          <div style={{ background: 'var(--card)', border: '1px solid var(--accent)', borderRadius: 16, padding: '32px 28px' }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--accent)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>
-              ⚠ Sin conexión con Firebase
-            </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', lineHeight: 1.7 }}>
-              {authError}
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-              <button className="btn primary" style={{ flex: 1, fontWeight: 700 }}
-                onClick={() => setRetries(r => r + 1)}>
-                ↺ Reintentar
-              </button>
-              <button className="btn" style={{ flex: 1 }}
-                onClick={() => window.location.reload()}>
-                Recargar
-              </button>
-            </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--dim)', marginTop: 14, lineHeight: 1.6 }}>
-              Si el error persiste: Firebase Console → Firestore → Reglas → verificá que permiten lectura.
-            </div>
-          </div>
-        )}
+          <input
+            type="email"
+            autoFocus
+            autoComplete="username"
+            value={email}
+            onChange={e => { setEmail(e.target.value); setError(false); }}
+            onKeyDown={handleKey}
+            style={{
+              width: '100%', fontSize: 14,
+              fontFamily: 'var(--font-mono)',
+              background: '#0B0B0B', border: `2px solid ${error ? 'var(--accent)' : 'var(--line)'}`,
+              borderRadius: 10, color: 'var(--text)', padding: '13px 14px', outline: 'none',
+              boxSizing: 'border-box', marginBottom: 10,
+              transition: 'border-color .2s',
+            }}
+            placeholder="email"
+          />
 
-        {/* Estado: listo para ingresar PIN */}
-        {!authLoading && !authError && correctPin.current && (
-          <div style={{
-            animation: shake ? 'shake 0.4s ease' : 'none',
-            background: 'var(--card)', border: `1px solid ${error ? 'var(--accent)' : 'var(--line)'}`,
-            borderRadius: 18, padding: '32px 28px',
-          }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 20 }}>
-              Ingresa tu PIN de acceso
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={e => { setPassword(e.target.value); setError(false); }}
+            onKeyDown={handleKey}
+            style={{
+              width: '100%', fontSize: 14,
+              fontFamily: 'var(--font-mono)', letterSpacing: '0.14em',
+              background: '#0B0B0B', border: `2px solid ${error ? 'var(--accent)' : password ? 'var(--accent)' : 'var(--line)'}`,
+              borderRadius: 10, color: 'var(--text)', padding: '13px 14px', outline: 'none',
+              boxSizing: 'border-box',
+              boxShadow: password ? '0 0 0 4px rgba(230,57,70,.1)' : 'none',
+              transition: 'border-color .2s, box-shadow .2s',
+            }}
+            placeholder="contraseña"
+          />
+
+          {error && (
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--accent)', letterSpacing: '0.08em', marginTop: 10, lineHeight: 1.6 }}>
+              {errorMsg}
             </div>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={8}
-              autoFocus
-              value={pin}
-              onChange={e => { setPin(e.target.value); setError(false); }}
-              onKeyDown={handleKey}
-              style={{
-                width: '100%', textAlign: 'center', fontSize: 32, fontWeight: 700,
-                fontFamily: 'var(--font-mono)', letterSpacing: '0.3em',
-                background: '#0B0B0B', border: `2px solid ${error ? 'var(--accent)' : pin ? 'var(--accent)' : 'var(--line)'}`,
-                borderRadius: 10, color: 'var(--text)', padding: '14px', outline: 'none',
-                boxSizing: 'border-box',
-                boxShadow: pin ? '0 0 0 4px rgba(230,57,70,.1)' : 'none',
-                transition: 'border-color .2s, box-shadow .2s',
-              }}
-              placeholder="••••"
-            />
-            {error && (
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--accent)', letterSpacing: '0.12em', marginTop: 10, textTransform: 'uppercase' }}>
-                PIN incorrecto · Intenta de nuevo
-              </div>
-            )}
-            <button
-              onClick={tryLogin}
-              className="btn primary"
-              style={{ width: '100%', padding: '14px', marginTop: 20, fontSize: 12, letterSpacing: '0.18em', borderRadius: 10 }}
-            >
-              ENTRAR AL SISTEMA
-            </button>
+          )}
+
+          <button
+            onClick={tryLogin}
+            disabled={submitting || !email.trim() || !password}
+            className="btn primary"
+            style={{
+              width: '100%', padding: '14px', marginTop: 20, fontSize: 12,
+              letterSpacing: '0.18em', borderRadius: 10,
+              opacity: (submitting || !email.trim() || !password) ? 0.45 : 1,
+            }}
+          >
+            {submitting ? 'VERIFICANDO…' : 'ENTRAR AL SISTEMA'}
+          </button>
+
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--dim)', marginTop: 16, lineHeight: 1.6 }}>
+            Misma cuenta que FRAME Studio Manager.
           </div>
-        )}
+        </div>
 
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--dim)', letterSpacing: '0.1em', marginTop: 24, textTransform: 'uppercase' }}>
           TOONED HN · Uso exclusivo
@@ -5846,7 +5829,7 @@ function DialogHost() {
 }
 
 function App({ onLogout }) {
-  const logout = () => { sessionStorage.removeItem('tooned-auth'); onLogout(); };
+  const logout = () => { sessionStorage.removeItem('tooned-auth'); onLogout(); }; // onLogout = firebase.auth().signOut()
 
   const [route, setRoute] = useS(() => localStorage.getItem('tooned-route') || 'nueva');
   const [orderKey, setOrderKey] = useS(0);
@@ -6737,9 +6720,34 @@ function App({ onLogout }) {
 }
 
 function Root() {
-  const [authed, setAuthed] = React.useState(() => sessionStorage.getItem('tooned-auth') === '1');
-  if (!authed) return <LoginScreen onAuth={() => setAuthed(true)} />;
-  return <App onLogout={() => setAuthed(false)} />;
+  // La sesión la maneja el SDK de Firebase, no sessionStorage. Antes bastaba
+  // con poner tooned-auth='1' a mano en el navegador para entrar; ahora el
+  // acceso a los datos lo decide Firestore según la sesión real, así que no
+  // hay nada que falsear del lado del cliente.
+  const [authUser, setAuthUser]       = React.useState(null);
+  const [authChecked, setAuthChecked] = React.useState(false);
+
+  React.useEffect(() => {
+    const unsub = firebase.auth().onAuthStateChanged(u => {
+      setAuthUser(u);
+      setAuthChecked(true);
+    });
+    return () => unsub();
+  }, []);
+
+  // <App> monta recién con sesión confirmada, así que ninguna lectura de
+  // Firestore sale antes de estar autenticado.
+  if (!authChecked) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0A0A0A' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#666', letterSpacing: '0.22em', textTransform: 'uppercase' }}>
+          Verificando sesión…
+        </div>
+      </div>
+    );
+  }
+  if (!authUser) return <LoginScreen />;
+  return <App onLogout={() => firebase.auth().signOut()} />;
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

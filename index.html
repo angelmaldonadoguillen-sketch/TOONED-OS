@@ -1,4 +1,4 @@
-﻿<!doctype html><!-- TOONED OS v2.11 -->
+﻿<!doctype html><!-- TOONED OS v2.12 -->
 <html lang="es">
 <head>
 <meta charset="utf-8" />
@@ -970,6 +970,32 @@ b, strong { font-weight: 500; }
 .btn.primary, .btn.primary:hover, .bell-badge { color: #0A0A0A; }
 .btn.primary:hover { background: #FFFFFF; border-color: #FFFFFF; }
 .nav-item.active { background: rgba(255,255,255,.08); }
+
+/* ── Diseños pre-impresos: tarjetas limpias ── */
+.dz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.dz-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; transition: border-color .15s; }
+.dz-card:hover { border-color: var(--line-2); }
+.dz-card.editing { border-color: var(--accent); }
+.dz-thumb { position: relative; aspect-ratio: 4 / 3; background: #0B0B0B; }
+.dz-img { position: absolute; inset: 0; transition: opacity .15s, filter .15s; }
+.dz-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.dz-card.agotado .dz-img { opacity: .35; filter: grayscale(1); }
+.dz-edit { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; background: rgba(10,10,10,.75); border: 1px solid var(--line-2); color: var(--muted); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .15s, color .15s, border-color .15s; }
+.dz-card:hover .dz-edit, .dz-card.editing .dz-edit { opacity: 1; }
+.dz-edit:hover { color: var(--text); border-color: var(--text); }
+@media (hover: none) { .dz-edit { opacity: 1; } }
+.dz-body { padding: 12px 14px 14px; }
+.dz-head { display: flex; align-items: baseline; gap: 10px; }
+.dz-name { flex: 1; min-width: 0; font-size: var(--fs-m); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dz-total { font-size: var(--fs-s); color: var(--text); white-space: nowrap; }
+.dz-total.off { color: var(--dim); }
+.dz-meta { font-size: var(--fs-s); color: var(--dim); letter-spacing: .04em; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dz-sizes { display: flex; flex-direction: column; margin-top: 10px; }
+.dz-size { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
+.dz-size:last-child { padding-bottom: 0; }
+.dz-sz { font-size: var(--fs-s); font-weight: 500; color: var(--muted); }
+.dz-edit-panel { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
+.dz-lbl { font-size: var(--fs-s); color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; }
 
 /* Selector de período de la barra superior */
 .ticker-period { color: var(--accent); font: inherit; font-weight: 500; letter-spacing: .06em; padding: 3px 10px; border: 1px solid rgba(var(--accent-rgb), .4); border-radius: 999px; cursor: pointer; background: transparent; }
@@ -3712,7 +3738,7 @@ function AddColorPanel({ existingColors, onAdd }) {
 }
 
 // StockStepper — the core inline control
-function StockStepper({ value, low, onAdd, onSub, onChange }) {
+function StockStepper({ value, low, onAdd, onSub, onChange, compact = false }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const inputRef = useRef(null);
@@ -3739,15 +3765,15 @@ function StockStepper({ value, low, onAdd, onSub, onChange }) {
       gap: 0,
       border: `1px solid ${value === 0 ? 'var(--line)' : low ? '#5c4516' : 'var(--line-2)'}`,
       background: bgColor,
-      height: 48,
-      borderRadius: 'var(--r-md)',
+      height: compact ? 32 : 48,
+      borderRadius: compact ? 10 : 'var(--r-md)',
       overflow: 'hidden',
     }}>
       <button
         onClick={onSub}
         disabled={value === 0}
         style={{
-          width: 36, height: '100%', flexShrink: 0,
+          width: compact ? 26 : 36, height: '100%', flexShrink: 0,
           fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-m)', fontWeight: 300,
           color: value === 0 ? 'var(--dim)' : 'var(--muted)',
           cursor: value === 0 ? 'default' : 'pointer',
@@ -3768,7 +3794,7 @@ function StockStepper({ value, low, onAdd, onSub, onChange }) {
           onBlur={commitEdit}
           onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
           style={{
-            width: 52, height: '100%',
+            width: compact ? 34 : 52, height: '100%',
             background: '#1A1A1A', border: 0, outline: 'none',
             fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-m)', fontWeight: 500,
             color: 'var(--text)', textAlign: 'center',
@@ -3779,9 +3805,9 @@ function StockStepper({ value, low, onAdd, onSub, onChange }) {
           onClick={startEdit}
           title="Click para editar"
           style={{
-            width: 52, height: '100%',
+            width: compact ? 34 : 52, height: '100%',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 'var(--fs-l)',
+            fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: compact ? 'var(--fs-m)' : 'var(--fs-l)',
             color: numColor,
             cursor: 'text',
             userSelect: 'none',
@@ -3792,7 +3818,7 @@ function StockStepper({ value, low, onAdd, onSub, onChange }) {
       <button
         onClick={onAdd}
         style={{
-          width: 36, height: '100%', flexShrink: 0,
+          width: compact ? 26 : 36, height: '100%', flexShrink: 0,
           fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-m)', fontWeight: 300,
           color: 'var(--muted)',
           cursor: 'pointer',
@@ -3800,7 +3826,7 @@ function StockStepper({ value, low, onAdd, onSub, onChange }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transition: 'color 0.1s, background 0.1s',
         }}
-        onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.background = '#1A0A0A'; }}
+        onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = '#1C1C1C'; }}
         onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'transparent'; }}
       >+</button>
     </div>
@@ -3959,6 +3985,8 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
   };
 
   const totalUds = dtfStock.reduce((a, s) => a + s.qty, 0);
+  const [stockFilter, setStockFilter] = useState('todos'); // todos | stock | agotados
+  const totalOf = (id) => dtfSizes.reduce((a, sz) => a + getQty(id, sz), 0);
 
   const dq = designSearch.toLowerCase().trim();
   const filteredDesigns = dq
@@ -3968,6 +3996,10 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
         (d.tag  || '').toLowerCase().includes(dq)
       )
     : designs;
+  const conStock = filteredDesigns.filter(d => totalOf(d.id) > 0);
+  const agotados = filteredDesigns.filter(d => totalOf(d.id) === 0);
+  // Con stock primero; los agotados al final (mismo orden de carga dentro de cada grupo)
+  const visibleDesigns = stockFilter === 'stock' ? conStock : stockFilter === 'agotados' ? agotados : [...conStock, ...agotados];
 
   return (
     <div>
@@ -4021,9 +4053,11 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
             </button>
           )}
         </div>
-        <span className="chip" style={{ marginLeft: 'auto' }}>
-          {designSearch ? `${filteredDesigns.length} de ${designs.length}` : `TOTAL  ${designs.length}`}
-        </span>
+        <div className="segmented" style={{ marginLeft: 'auto' }}>
+          {[['todos', 'Todos', filteredDesigns.length], ['stock', 'Con stock', conStock.length], ['agotados', 'Agotados', agotados.length]].map(([id, lbl, n]) => (
+            <button key={id} className={stockFilter === id ? 'on' : ''} onClick={() => setStockFilter(id)}>{lbl} · {n}</button>
+          ))}
+        </div>
       </div>
 
       {/* Size manager */}
@@ -4057,150 +4091,104 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
         <NewDisenoForm onSave={saveNewDesign} onCancel={() => setShowNew(false)} designCats={designCats} setDesignCats={setDesignCats} designs={designs} />
       )}
 
-      {/* Design cards grid */}
-      {filteredDesigns.length === 0 && (
+      {/* Design cards grid — tarjetas limpias: foto, nombre, stock por tamaño.
+          Editar / eliminar / costos / miniatura quedan dentro del botón ✎ */}
+      {visibleDesigns.length === 0 && (
         <div className="mono" style={{ textAlign: 'center', padding: '40px 0', color: 'var(--dim)', fontSize: 'var(--fs-s)', letterSpacing: '0.08em' }}>
-          {designSearch ? `Sin resultados para "${designSearch}"` : 'No hay diseños registrados'}
+          {designSearch ? `Sin resultados para "${designSearch}"` : stockFilter === 'agotados' ? 'No hay diseños agotados' : stockFilter === 'stock' ? 'Ningún diseño tiene stock' : 'No hay diseños registrados'}
         </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-        {filteredDesigns.map(d => {
-          const designTotal = dtfSizes.reduce((a, sz) => a + getQty(d.id, sz), 0);
+      <div className="dz-grid">
+        {visibleDesigns.map(d => {
+          const designTotal = totalOf(d.id);
           const isEditing = editingDesign === d.id;
           const isAgotado = designTotal === 0;
           return (
-            <div key={d.id} style={{ background: 'var(--card)', border: `1px solid ${isEditing ? 'var(--danger)' : isAgotado ? '#3D1515' : 'var(--line)'}`, overflow: 'hidden', opacity: isAgotado ? 0.82 : 1 }}>
-              <div style={{ aspectRatio: '16/9', background: '#0B0B0B', position: 'relative', borderBottom: `1px solid ${isAgotado ? '#3D1515' : 'var(--line)'}` }}>
-                <CatThumb id={d.id} />
-                {d.thumb && <img src={d.thumb} alt={d.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: isAgotado ? 'grayscale(35%)' : 'none' }} />}
-                <button
-                  onClick={() => uiConfirm({ title: 'Eliminar diseño', message: `Se quitará "${d.name}" del catálogo junto con su stock DTF.`, confirmLabel: 'Eliminar' }).then(ok => { if (ok) deleteDesign(d.id); })}
-                  style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.82)', border: '1px solid #3D1515', color: 'var(--danger)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-s)', padding: '3px 8px', cursor: 'pointer', letterSpacing: '0.08em', zIndex: 4 }}>
-                  × Eliminar
+            <div key={d.id} className={`dz-card${isAgotado ? ' agotado' : ''}${isEditing ? ' editing' : ''}`}>
+              <div className="dz-thumb">
+                <div className="dz-img">
+                  <CatThumb id={d.id} />
+                  {d.thumb && <img src={d.thumb} alt={d.name} />}
+                </div>
+                <button className="dz-edit" onClick={() => isEditing ? setEditingDesign(null) : startEditing(d)} title={isEditing ? 'Cerrar edición' : 'Editar diseño'}>
+                  <Icon name={isEditing ? 'x' : 'edit'} size={13} />
                 </button>
-                <div style={{
-                  position: 'absolute', top: 10, right: 10, zIndex: 4,
-                  background: designTotal > 0 ? 'var(--accent)' : 'rgba(0,0,0,0.75)',
-                  color: designTotal > 0 ? '#0A0A0A' : 'var(--muted)',
-                  border: `1px solid ${designTotal > 0 ? 'var(--accent)' : 'var(--line-2)'}`,
-                  borderRadius: 'var(--r-pill)',
-                  fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 'var(--fs-s)',
-                  padding: '4px 10px', letterSpacing: '0.04em',
-                }}>{designTotal > 0 ? `${designTotal} UDS` : '0 UDS'}</div>
-                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '12px 14px', background: 'linear-gradient(transparent, rgba(0,0,0,0.85))', zIndex: 2 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 'var(--fs-m)', letterSpacing: '-0.005em' }}>{d.name}</div>
-                    {isAgotado && (
-                      <span style={{ flexShrink: 0, fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 'var(--fs-s)', letterSpacing: '0.08em', color: '#fff', background: 'var(--accent)', borderRadius: 'var(--r-pill)', padding: '3px 10px', textTransform: 'uppercase' }}>
-                        Agotado
-                      </span>
-                    )}
-                  </div>
-                  <div className="mono" style={{ fontSize: 'var(--fs-s)', color: 'var(--muted)', letterSpacing: '0.08em', marginTop: 2 }}>
-                    {d.id} · {d.tag}
-                    {d.cost > 0 && <span style={{ color: 'var(--muted)' }}> · L {d.cost} costo</span>}
-                  </div>
-                </div>
               </div>
-              <div style={{ padding: '14px 16px 18px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-                  <div className="mono" style={{ fontSize: 'var(--fs-s)', color: 'var(--muted)', letterSpacing: '0.14em', textTransform: 'uppercase', flex: 1 }}>Stock por tamaño</div>
-                  <button
-                    onClick={() => isEditing ? setEditingDesign(null) : startEditing(d)}
-                    className="btn sm ghost"
-                    style={{ fontSize: 'var(--fs-s)', padding: '2px 8px', color: isEditing ? 'var(--ok)' : 'var(--muted)' }}>
-                    {isEditing ? '✓ Cerrar' : '✎ Editar'}
-                  </button>
+
+              <div className="dz-body">
+                <div className="dz-head">
+                  <div className="dz-name" title={d.name}>{d.name}</div>
+                  <span className={`dz-total${isAgotado ? ' off' : ''}`}>{isAgotado ? 'Agotado' : `${designTotal} uds`}</span>
                 </div>
-                {isEditing && (
-                  <div style={{ marginBottom: 14, padding: '12px 14px', background: '#0B0B0B', border: '1px solid var(--line)', display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-                    <div style={{ flex: '0 0 90px' }}>
-                      <div className="mono" style={{ fontSize: 'var(--fs-s)', color: 'var(--muted)', letterSpacing: '0.1em', marginBottom: 4 }}>SKU</div>
-                      <input className="input mono" style={{ fontSize: 'var(--fs-s)', height: 30, padding: '0 8px' }}
-                        value={editMeta[d.id]?.id ?? d.id}
-                        onChange={e => setEditMeta(prev => ({ ...prev, [d.id]: { ...(prev[d.id] || { id: d.id, name: d.name }), id: e.target.value.toUpperCase() } }))} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div className="mono" style={{ fontSize: 'var(--fs-s)', color: 'var(--muted)', letterSpacing: '0.1em', marginBottom: 4 }}>NOMBRE</div>
-                      <input className="input" style={{ fontSize: 'var(--fs-s)', height: 30, padding: '0 8px' }}
-                        value={editMeta[d.id]?.name ?? d.name}
-                        onChange={e => setEditMeta(prev => ({ ...prev, [d.id]: { ...(prev[d.id] || { id: d.id, name: d.name }), name: e.target.value } }))} />
-                    </div>
-                    <button className="btn sm primary" style={{ height: 30, fontSize: 'var(--fs-s)', whiteSpace: 'nowrap' }} onClick={() => renameDesign(d.id)}>
-                      Guardar
-                    </button>
-                  </div>
-                )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div className="dz-meta">{d.id}{d.tag ? ` · ${d.tag}` : ''}</div>
+
+                <div className="dz-sizes">
                   {dtfSizes.map(sz => {
                     const qty = getQty(d.id, sz);
-                    const pricing = d.pricing?.[sz] || {};
                     return (
-                      <div key={sz}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{ width: 38, fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 'var(--fs-m)', color: 'var(--text)', letterSpacing: '0.04em', flexShrink: 0 }}>{sz}</div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ height: 6, background: '#111', position: 'relative', overflow: 'hidden' }}>
-                              {qty > 0 && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, background: 'var(--accent)', width: `${Math.min(100, (qty / 20) * 100)}%`, transition: 'width 0.2s' }} />}
-                            </div>
-                          </div>
-                          <StockStepper value={qty} low={qty > 0 && qty <= 3}
-                            onAdd={() => adjustQty(d.id, sz, 1)}
-                            onSub={() => adjustQty(d.id, sz, -1)}
-                            onChange={v => setQtyVal(d.id, sz, v)} />
-                        </div>
-                        {isEditing ? (
-                          <div style={{ display: 'flex', gap: 8, marginTop: 5, paddingLeft: 48 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <span className="mono" style={{ fontSize: 'var(--fs-s)', color: 'var(--muted)', whiteSpace: 'nowrap' }}>Costo L</span>
-                              <input type="number" min="0" value={pricing.costo || ''}
-                                onChange={e => updateDesignPricing(d.id, sz, 'costo', e.target.value)}
-                                className="mono"
-                                style={{ width: 62, padding: '3px 6px', background: '#0B0B0B', border: '1px solid var(--line)', color: 'var(--text)', fontSize: 'var(--fs-s)', outline: 'none' }} />
-                            </div>
-                          </div>
-                        ) : (pricing.costo > 0) && (
-                          <div className="mono" style={{ fontSize: 'var(--fs-s)', paddingLeft: 48, marginTop: 3, letterSpacing: '0.04em' }}>
-                            <span style={{ color: 'var(--muted)' }}>L {pricing.costo} costo</span>
-                          </div>
-                        )}
+                      <div key={sz} className="dz-size">
+                        <span className="dz-sz">{sz}</span>
+                        <StockStepper compact value={qty} low={qty > 0 && qty <= 3}
+                          onAdd={() => adjustQty(d.id, sz, 1)}
+                          onSub={() => adjustQty(d.id, sz, -1)}
+                          onChange={v => setQtyVal(d.id, sz, v)} />
                       </div>
                     );
                   })}
                 </div>
+
                 {isEditing && (
-                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
-                    <div className="mono" style={{ fontSize: 'var(--fs-s)', color: 'var(--muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Precio venta base (usado en órdenes)</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                      <span className="mono" style={{ fontSize: 'var(--fs-s)', color: 'var(--muted)' }}>L</span>
-                      <input type="number" min="0" className="mono"
-                        value={d.cost || ''}
-                        placeholder="0"
-                        onChange={e => setDesigns(prev => prev.map(x => x.id === d.id ? { ...x, cost: Number(e.target.value) || 0 } : x))}
-                        style={{ width: 90, padding: '5px 8px', background: '#0B0B0B', border: '1px solid var(--accent)', color: 'var(--ok)', fontSize: 'var(--fs-m)', outline: 'none', fontWeight: 500 }} />
-                      <span className="mono" style={{ fontSize: 'var(--fs-s)', color: 'var(--dim)' }}>precio que aparece al crear una venta</span>
-                    </div>
-                    <div className="mono" style={{ fontSize: 'var(--fs-s)', color: 'var(--muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Miniatura</div>
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                      <div
-                        onClick={() => document.getElementById(`thumb-${d.id}`).click()}
-                        style={{ width: 56, height: 56, border: `1px solid ${d.thumb ? 'var(--accent)' : 'var(--line)'}`, background: '#0B0B0B', flexShrink: 0, overflow: 'hidden', position: 'relative', cursor: 'pointer' }}>
-                        {d.thumb
-                          ? <img src={d.thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          : <CatThumb id={d.id} />}
+                  <div className="dz-edit-panel">
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                      <div style={{ flex: '0 0 96px' }}>
+                        <div className="dz-lbl">SKU</div>
+                        <input className="input mono" style={{ padding: '8px 10px' }}
+                          value={editMeta[d.id]?.id ?? d.id}
+                          onChange={e => setEditMeta(prev => ({ ...prev, [d.id]: { ...(prev[d.id] || { id: d.id, name: d.name }), id: e.target.value.toUpperCase() } }))} />
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="dz-lbl">Nombre</div>
+                        <input className="input" style={{ padding: '8px 10px' }}
+                          value={editMeta[d.id]?.name ?? d.name}
+                          onChange={e => setEditMeta(prev => ({ ...prev, [d.id]: { ...(prev[d.id] || { id: d.id, name: d.name }), name: e.target.value } }))} />
+                      </div>
+                    </div>
+                    <button className="btn sm primary" style={{ alignSelf: 'flex-start' }} onClick={() => renameDesign(d.id)}>Guardar nombre</button>
+
+                    <div>
+                      <div className="dz-lbl">Costo por tamaño</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {dtfSizes.map(sz => (
+                          <label key={sz} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--fs-s)', color: 'var(--muted)' }}>
+                            {sz} · L
+                            <input type="number" min="0" className="input mono" style={{ width: 70, padding: '6px 8px' }}
+                              value={d.pricing?.[sz]?.costo || ''}
+                              onChange={e => updateDesignPricing(d.id, sz, 'costo', e.target.value)} />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="dz-lbl">Precio de venta base</div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--fs-s)', color: 'var(--muted)' }}>
+                        L
+                        <input type="number" min="0" className="input mono" style={{ width: 96, padding: '6px 8px' }} placeholder="0"
+                          value={d.cost || ''}
+                          onChange={e => setDesigns(prev => prev.map(x => x.id === d.id ? { ...x, cost: Number(e.target.value) || 0 } : x))} />
+                      </label>
+                      <div style={{ fontSize: 'var(--fs-s)', color: 'var(--dim)', marginTop: 4 }}>Es el precio que aparece al crear una venta.</div>
+                    </div>
+
+                    <div>
+                      <div className="dz-lbl">Miniatura</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button className="btn sm" disabled={uploadingId === d.id}
                           onClick={() => document.getElementById(`thumb-${d.id}`).click()}>
-                          {uploadingId === d.id
-                            ? <><span style={{ animation: 'tick 0.8s infinite alternate' }}>⏱</span> Subiendo…</>
-                            : <><Icon name="plus" size={11} /> {d.thumb ? 'Cambiar imagen' : 'Subir imagen'}</>}
+                          {uploadingId === d.id ? 'Subiendo…' : <><Icon name="plus" size={11} /> {d.thumb ? 'Cambiar imagen' : 'Subir imagen'}</>}
                         </button>
                         {d.thumb && (
-                          <button className="btn sm ghost" style={{ fontSize: 'var(--fs-s)' }}
-                            onClick={() => setDesigns(prev => prev.map(x => x.id === d.id ? { ...x, thumb: null } : x))}>
-                            × Quitar miniatura
-                          </button>
+                          <button className="btn sm ghost" onClick={() => setDesigns(prev => prev.map(x => x.id === d.id ? { ...x, thumb: null } : x))}>Quitar imagen</button>
                         )}
                       </div>
                       <input id={`thumb-${d.id}`} type="file" accept="image/*" style={{ display: 'none' }}
@@ -4214,6 +4202,11 @@ function DisenosTab({ dtfSizes, setDtfSizes, dtfStock, setDtfStock, designs, set
                           }).finally(() => setUploadingId(null));
                         }} />
                     </div>
+
+                    <button className="btn sm ghost" style={{ alignSelf: 'flex-start', color: 'var(--danger)' }}
+                      onClick={() => uiConfirm({ title: 'Eliminar diseño', message: `Se quitará "${d.name}" del catálogo junto con su stock DTF.`, confirmLabel: 'Eliminar' }).then(ok => { if (ok) { deleteDesign(d.id); setEditingDesign(null); } })}>
+                      <Icon name="trash" size={12} /> Eliminar diseño
+                    </button>
                   </div>
                 )}
               </div>

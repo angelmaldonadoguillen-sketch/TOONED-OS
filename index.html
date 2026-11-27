@@ -1,4 +1,4 @@
-﻿<!doctype html><!-- TOONED OS v2.17 -->
+﻿<!doctype html><!-- TOONED OS v2.18 -->
 <html lang="es">
 <head>
 <meta charset="utf-8" />
@@ -1401,6 +1401,16 @@ b, strong { font-weight: 500; }
     return 'ok';
   };
 
+  P.agregarForma = function () {
+    var capa = { tipo: 'forma', cx: ZONA.w / 2, cy: 3 + 15, w: 25, asp: 30 / 25, rot: 0, flip: false };
+    this.consejo = true;
+    this.capas[this.lado].push(capa);
+    this.seleccionar(capa);
+    this.dibujar();
+    this.actualizarPrecio();
+    this.guardar();
+  };
+
   P.agregarTexto = function () {
     var capa = { tipo: 'texto', texto: 'TU TEXTO', fuente: FUENTES[0].id, color: this.color === 'negro' ? '#ffffff' : '#111111',
       contorno: 0, colorContorno: this.color === 'negro' ? '#111111' : '#ffffff', curva: 0,
@@ -1472,6 +1482,7 @@ b, strong { font-weight: 500; }
     var r = this.root, esTexto = capa && capa.tipo === 'texto', esImg = capa && capa.tipo === 'img';
     $(r, '[data-tn-panel-texto]').hidden = !esTexto;
     $(r, '[data-tn-panel-img]').hidden = !esImg;
+    var pf = $(r, '[data-tn-panel-forma]'); if (pf) pf.hidden = !(capa && capa.tipo === 'forma');
     $(r, '[data-tn-acciones-capa]').hidden = !capa;
     var lado = this.lado;
     $$(r, '[data-tn-ubic-lado]').forEach(function (g) { g.hidden = g.getAttribute('data-tn-ubic-lado') !== lado; });
@@ -1648,14 +1659,14 @@ b, strong { font-weight: 500; }
     var v = parseFloat(String(valor).replace(',', '.'));
     if (!(v > 0)) { this.sincronizarMedidas(); return; }
     var arriba = cp.cy - cp.w * cp.asp / 2;            // el borde de arriba queda fijo: crece hacia abajo
-    if (this.enlazado) {
+    if (this.enlazado && cp.tipo !== 'forma') {
       cp.w = this.limitarAncho(cp, campo === 'alto' ? v / cp.asp : v);
     } else {
       // libre: se cambia solo una medida y la otra queda igual → cambia la proporción (la imagen se deforma)
       var altoAntes = cp.w * cp.asp, nuevoAsp;
       if (campo === 'alto') { var h = Math.max(1, Math.min(ZONA.h, v)); nuevoAsp = h / cp.w; }
       else { var w = Math.max(1, Math.min(ZONA.w, v)); nuevoAsp = altoAntes / w; cp.w = w; }
-      cp.estira = (cp.estira || 1) * nuevoAsp / cp.asp;
+      if (cp.tipo !== 'forma') cp.estira = (cp.estira || 1) * nuevoAsp / cp.asp;
       cp.asp = nuevoAsp;
     }
     var alto = cp.w * cp.asp;
@@ -1668,6 +1679,27 @@ b, strong { font-weight: 500; }
   };
 
   P.pintarCapa = function (x, cp, pxcm, ox, oy) {
+    if (cp.tipo === 'forma') {
+      if (pxcm > PX_CM) return;                         // archivo DTF: el rectángulo es solo referencia
+      var fw = cp.w * pxcm, fh = fw * cp.asp, k = pxcm / PX_CM;
+      x.save();
+      x.translate(ox + cp.cx * pxcm, oy + cp.cy * pxcm);
+      x.rotate(cp.rot);
+      x.fillStyle = 'rgba(107,163,224,.38)';
+      x.fillRect(-fw / 2, -fh / 2, fw, fh);
+      x.setLineDash([7 * k, 5 * k]);
+      x.lineWidth = 2 * k;
+      x.strokeStyle = '#6BA3E0';
+      x.strokeRect(-fw / 2, -fh / 2, fw, fh);
+      var fz = Math.max(11 * k, Math.min(30 * k, Math.min(fw, fh) * 0.16));
+      x.font = '600 ' + fz + 'px system-ui, sans-serif';
+      x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillStyle = '#fff';
+      x.shadowColor = 'rgba(0,0,0,.6)'; x.shadowBlur = 4 * k;
+      x.fillText(cp.w.toFixed(1).replace('.0', '') + ' × ' + (cp.w * cp.asp).toFixed(1).replace('.0', '') + ' cm', 0, 0);
+      x.restore();
+      return;
+    }
     x.save();
     x.translate(ox + cp.cx * pxcm, oy + cp.cy * pxcm);
     x.rotate(cp.rot);
@@ -1738,8 +1770,8 @@ b, strong { font-weight: 500; }
   P.etiquetaTam = function (t) { return t === 'grande' ? 'Personalizado' : t; };
 
   // Caja que encierra todo el diseño de un lado (cm, relativa a la zona), recortada a la zona
-  P.caja = function (lado) {
-    var self = this, z = this.zona(lado), arr = this.capas[lado];
+  P.caja = function (lado, soloImprime) {
+    var self = this, z = this.zona(lado), arr = this.capas[lado].filter(function (cp) { return !soloImprime || cp.tipo !== 'forma'; });
     if (!arr.length) return null;
     var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     arr.forEach(function (cp) {
@@ -1932,6 +1964,7 @@ b, strong { font-weight: 500; }
     $(r, '[data-tn-subir]').addEventListener('click', function () { file.click(); });
     file.addEventListener('change', function () { self.agregarImagen(file.files[0]); file.value = ''; });
     $(r, '[data-tn-agregar-texto]').addEventListener('click', function () { self.agregarTexto(); self.actualizarPrecio(); });
+    var bf = $(r, '[data-tn-agregar-forma]'); if (bf) bf.addEventListener('click', function () { self.agregarForma(); });
     $(r, '[data-tn-borrar]').addEventListener('click', function () { self.borrarSel(); });
     $(r, '[data-tn-duplicar]').addEventListener('click', function () { self.duplicarSel(); });
     $(r, '[data-tn-voltear]').addEventListener('click', conSel(function (cp) { cp.flip = !cp.flip; self.dibujar(); self.guardar(); }));
@@ -2095,7 +2128,7 @@ b, strong { font-weight: 500; }
 
   // Archivos para producción: vista previa JPG + un PNG por lado a tamaño real
   P.exportar = function (id) {
-    var self = this, lados = this.ladosUsados();
+    var self = this, lados = this.ladosUsados().filter(function (l) { return self.caja(l, true); });
     var trabajos = [aBlob(this.vistaPrevia(), 'image/jpeg', 0.9).then(function (b) { return { tipo: 'vista', blob: b, nombre: id + '-vista.jpg' }; })];
     lados.forEach(function (l) {
       trabajos.push(aBlob(self.archivoImpresion(l), 'image/png').then(function (b) { return { tipo: l, blob: b, nombre: id + '-' + l + '-DTF.png' }; }));
@@ -2112,7 +2145,7 @@ b, strong { font-weight: 500; }
 
   // Archivo para DTF: PNG transparente recortado a la caja del diseño y a tamaño real; baja de 300 dpi solo si no cabe en un teléfono
   P.archivoImpresion = function (lado) {
-    var self = this, caja = this.caja(lado);
+    var self = this, caja = this.caja(lado, true);
     var dpiPx = Math.min(PRINT_PX_CM, Math.sqrt(MAX_PX / (caja.w * caja.h)));
     var c = lienzo(caja.w * dpiPx, caja.h * dpiPx);
     var x = c.getContext('2d');
@@ -2151,6 +2184,7 @@ b, strong { font-weight: 500; }
   P.describir = function (lado) {
     var c = this.caja(lado);
     var partes = this.capas[lado].map(function (cp) {
+      if (cp.tipo === 'forma') return 'rectángulo de referencia';
       if (cp.tipo !== 'texto') return 'imagen' + (cp.sinFondo ? ' (sin fondo)' : '');
       return 'texto "' + cp.texto.replace(/\n/g, ' ') + '" (' + cp.fuente + (cp.contorno ? ', con contorno' : '') + (cp.curva ? ', en arco' : '') + ')';
     }).join(' + ');
@@ -6476,6 +6510,7 @@ const CZ_TOOLS_HTML = `
       <div class="tn-p__fila">
         <button type="button" class="tn-p__accion" data-tn-subir>+ Subir imagen</button>
         <button type="button" class="tn-p__accion" data-tn-agregar-texto>+ Agregar texto</button>
+        <button type="button" class="tn-p__accion" data-tn-agregar-forma title="Cotizar sin imagen: un rectángulo con la medida que pide el cliente">+ Rectángulo</button>
       </div>
       <input type="file" accept="image/png,image/jpeg,image/webp" data-tn-archivo hidden>
       <div class="tn-p__avisos" data-tn-aviso role="status" hidden></div>
@@ -6507,6 +6542,10 @@ const CZ_TOOLS_HTML = `
         <div class="tn-p__fila" role="group" aria-label="Tamaño del diseño">
           <button type="button" class="tn-p__chip tn-p__chip--sm" data-tn-tam="A4">A4 · 21 × 30</button>
           <button type="button" class="tn-p__chip tn-p__chip--sm" data-tn-tam="A3">A3 · 30 × 42</button>
+        </div>
+
+        <div class="tn-p__sub-panel" data-tn-panel-forma hidden>
+          <span class="tn-p__mini-etiqueta">Rectángulo de referencia: escribí el ancho y el alto que pide el cliente. Se cobra por su medida, pero no sale en el archivo DTF.</span>
         </div>
 
         <div class="tn-p__sub-panel" data-tn-panel-img hidden>
@@ -6657,7 +6696,8 @@ function Cotizador({ prendas = PRENDAS, payConfig = PAY_CONFIG_DEFAULT, tarifas,
     const id = idCot();
     ed.exportar(id).then(arch => {
       arch.forEach((a, i) => setTimeout(() => ed.descargarArchivo(a.blob, a.nombre), i * 400));
-      showToast && showToast(`${arch.length} archivo${arch.length > 1 ? 's' : ''} descargado${arch.length > 1 ? 's' : ''} · ${id}`);
+      const soloVista = arch.length === 1;
+      showToast && showToast(soloVista ? `Solo la vista previa: los rectángulos no se imprimen · ${id}` : `${arch.length} archivos descargados · ${id}`);
     }).catch(e => uiAlert({ title: 'No se pudieron preparar los archivos', message: String(e && e.message || e) }))
       .then(() => setExportando(false));
   };

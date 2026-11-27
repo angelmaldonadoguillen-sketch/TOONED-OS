@@ -1,7 +1,7 @@
-// TOONED OS — Service Worker v23
+// TOONED OS — Service Worker v24
 // Red primero para la app (así cada actualización llega sola) y caché solo
 // como respaldo sin conexión. Firebase, fuentes y CDN pasan directo.
-const CACHE = 'tooned-os-v23';
+const CACHE = 'tooned-os-v24';
 const SHELL = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {

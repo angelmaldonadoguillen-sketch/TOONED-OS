@@ -1,4 +1,4 @@
-﻿<!doctype html><!-- TOONED OS v2.14 -->
+﻿<!doctype html><!-- TOONED OS v2.15 -->
 <html lang="es">
 <head>
 <meta charset="utf-8" />
@@ -6354,22 +6354,22 @@ Object.assign(window, { Embudo });
 </script>
 <script type="text/babel">
 // ── Cotizador de personalizados: editor visual + costos reales + precio sugerido ──
-// Tarifas de venta (por lado, según tamaño) y costos de DTF; se guardan en data/config → cotizador
-const CZ_DEFAULT = { base: 419, a4: 80, a3: 180, grande: 330, costoA4: 40, costoA3: 90, metroDTF: 419, extra: 0 };
+// Tarifas: el estampado se cobra por cm² (ancho × alto real del diseño) y el DTF se paga por cm² del rollo de 58 cm.
+// Se guardan en data/config → cotizador
+const CZ_DEFAULT = { base: 419, tarifaCm2: 0.144, minimoLado: 60, metroDTF: 419, minimoDTF: 20, extra: 0 };
+const CZ_ROLLO_CM2 = 58 * 100;     // un metro de rollo DTF de 58 cm de ancho
 const CZ_TALLAS = ['S', 'M', 'L', 'XL', 'XXL'];
-const CZ_TAM_LABEL = { A4: 'A4', A3: 'A3', grande: 'Grande' };
 
-// Costo del DTF de un lado: A4 y A3 a precio fijo; más grande se cobra por largo de rollo (58 cm de ancho)
+const czArea = (lado) => lado ? lado.w * lado.h : 0;
+// Costo del DTF de un lado: área × (precio del metro ÷ 5800 cm²), con un mínimo por lámina
 function czCostoDTF(lado, cfg) {
   if (!lado) return 0;
-  if (lado.tam === 'A4') return cfg.costoA4;
-  if (lado.tam === 'A3') return cfg.costoA3;
-  const largo = (lado.w <= 58 && lado.h <= 58) ? Math.min(lado.w, lado.h) : lado.h;
-  return Math.ceil(largo / 100 * cfg.metroDTF);
+  return Math.max(cfg.minimoDTF, Math.ceil(czArea(lado) * cfg.metroDTF / CZ_ROLLO_CM2));
 }
+// Precio de venta de un lado: área × tarifa por cm², con mínimo, redondeado a L 5
 function czPrecioLado(lado, cfg) {
   if (!lado) return 0;
-  return lado.tam === 'A4' ? cfg.a4 : lado.tam === 'A3' ? cfg.a3 : cfg.grande;
+  return Math.max(cfg.minimoLado, Math.round(czArea(lado) * cfg.tarifaCm2 / 5) * 5);
 }
 
 const CZ_LIENZO_HTML = `
@@ -6477,13 +6477,13 @@ const CZ_TOOLS_HTML = `
     </div>
   </div>`;
 
-function CzNumero({ label, value, onChange, prefijo = 'L', ayuda }) {
+function CzNumero({ label, value, onChange, prefijo = 'L', ayuda, decimales }) {
   return (
     <label className="cz-num">
       <span className="cz-num-l">{label}</span>
       <span className="cz-num-c">
         {prefijo && <span className="cz-num-p">{prefijo}</span>}
-        <input className="input" type="number" min="0" step="1" value={value}
+        <input className="input" type="number" min="0" step={decimales ? '0.001' : '1'} value={value}
           onChange={e => onChange(Math.max(0, Number(e.target.value) || 0))} />
       </span>
       {ayuda && <span className="cz-num-a">{ayuda}</span>}
@@ -6540,7 +6540,7 @@ function Cotizador({ prendas = PRENDAS, payConfig = PAY_CONFIG_DEFAULT, tarifas,
     const margen = unit * q > 0 ? ganancia / (unit * q) * 100 : 0;
     const minimoUnit = q > 0 ? Math.ceil(((inversion + envio) / (1 - pct / 100) - envio) / q) : 0;
     return { dtf, costoUnit, sugeridoUnit, unit, envio, pct, total, inversion, comision, ganancia, margen, minimoUnit, pm };
-  }, [resumen, cfg.base, cfg.a4, cfg.a3, cfg.grande, cfg.costoA4, cfg.costoA3, cfg.metroDTF, cfg.extra, costoCamisa, precioManual, pago, payConfig, q]);
+  }, [resumen, cfg.base, cfg.tarifaCm2, cfg.minimoLado, cfg.metroDTF, cfg.minimoDTF, cfg.extra, costoCamisa, precioManual, pago, payConfig, q]);
 
   const nombreColor = resumen.color === 'negro' ? 'negra' : 'blanca';
   const idCot = () => 'CZ' + Date.now().toString(36).toUpperCase().slice(-5);
@@ -6553,7 +6553,7 @@ function Cotizador({ prendas = PRENDAS, payConfig = PAY_CONFIG_DEFAULT, tarifas,
     l.push(`${nombrePrenda} ${nombreColor}, talla ${talla}${q > 1 ? ` × ${q}` : ''}`);
     lados.forEach(ld => {
       const x = resumen.lados[ld];
-      l.push(`${ld === 'espalda' ? 'Espalda' : 'Frente'}: ${CZ_TAM_LABEL[x.tam]} (${x.w.toFixed(0)} × ${x.h.toFixed(0)} cm)`);
+      l.push(`${ld === 'espalda' ? 'Espalda' : 'Frente'}: ${x.w.toFixed(0)} × ${x.h.toFixed(0)} cm`);
     });
     l.push(`Precio: ${L(c.unit)}${q > 1 ? ' c/u' : ''}`);
     if (c.envio > 0) l.push(`Envío: ${L(c.envio)}`);
@@ -6594,7 +6594,7 @@ function Cotizador({ prendas = PRENDAS, payConfig = PAY_CONFIG_DEFAULT, tarifas,
       <div className="page-head">
         <div>
           <div className="page-title">Cotizador</div>
-          <div className="page-desc">Subí el diseño del cliente, acomodalo en la camiseta y el sistema mide el tamaño real y calcula costo, precio y ganancia.</div>
+          <div className="page-desc">Subí el diseño del cliente, acomodalo en la camiseta y el sistema mide los cm reales y calcula costo, precio por cm² y ganancia.</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn sm ghost" onClick={nueva}><Icon name="refresh" size={11} /> Nueva</button>
@@ -6609,15 +6609,15 @@ function Cotizador({ prendas = PRENDAS, payConfig = PAY_CONFIG_DEFAULT, tarifas,
             <div>
               <div className="cz-sub">Precio de venta</div>
               <CzNumero label="Camiseta (base)" value={cfg.base} onChange={t('base')} />
-              <CzNumero label="+ por lado A4" value={cfg.a4} onChange={t('a4')} />
-              <CzNumero label="+ por lado A3" value={cfg.a3} onChange={t('a3')} />
-              <CzNumero label="+ por lado grande" value={cfg.grande} onChange={t('grande')} ayuda="Más grande que A3, hasta 58 cm" />
+              <CzNumero label="Estampado por cm²" value={cfg.tarifaCm2} onChange={t('tarifaCm2')} decimales
+                ayuda={`Un A4 sale ${L(czPrecioLado({ w: 21, h: 29.7 }, cfg))} · un A3 ${L(czPrecioLado({ w: 29.7, h: 42 }, cfg))} · 10×10 cm ${L(czPrecioLado({ w: 10, h: 10 }, cfg))}`} />
+              <CzNumero label="Mínimo por lado" value={cfg.minimoLado} onChange={t('minimoLado')} ayuda="Para logos y textos chicos" />
             </div>
             <div>
               <div className="cz-sub">Costo del DTF</div>
-              <CzNumero label="Lámina A4" value={cfg.costoA4} onChange={t('costoA4')} />
-              <CzNumero label="Lámina A3" value={cfg.costoA3} onChange={t('costoA3')} />
-              <CzNumero label="Metro de rollo (58 cm)" value={cfg.metroDTF} onChange={t('metroDTF')} ayuda="Para lo más grande que A3: se cobra el largo usado" />
+              <CzNumero label="Metro de rollo (58 cm)" value={cfg.metroDTF} onChange={t('metroDTF')}
+                ayuda={`= L ${(cfg.metroDTF / CZ_ROLLO_CM2).toFixed(3)} por cm² · un A3 cuesta ${L(czCostoDTF({ w: 29.7, h: 42 }, cfg))}`} />
+              <CzNumero label="Mínimo por lámina" value={cfg.minimoDTF} onChange={t('minimoDTF')} />
               <CzNumero label="Extra por pieza" value={cfg.extra} onChange={t('extra')} ayuda="Planchado, bolsa, etiqueta…" />
             </div>
             <div className="cz-nota">El costo de la camiseta sale de Inventario → Prendas, según el color elegido.</div>
@@ -6659,7 +6659,7 @@ function Cotizador({ prendas = PRENDAS, payConfig = PAY_CONFIG_DEFAULT, tarifas,
                 <div className="summary-row"><span className="l">Camiseta {nombreColor}</span><span className="r mono">{L(costoCamisa)}</span></div>
                 {lados.map(ld => {
                   const x = resumen.lados[ld];
-                  return <div key={ld} className="summary-row"><span className="l">DTF {ld} · {CZ_TAM_LABEL[x.tam]} {x.w.toFixed(0)}×{x.h.toFixed(0)}</span><span className="r mono">{L(czCostoDTF(x, cfg))}</span></div>;
+                  return <div key={ld} className="summary-row"><span className="l">DTF {ld} · {x.w.toFixed(1)}×{x.h.toFixed(1)} cm</span><span className="r mono">{L(czCostoDTF(x, cfg))}</span></div>;
                 })}
                 {cfg.extra > 0 && <div className="summary-row"><span className="l">Extra</span><span className="r mono">{L(cfg.extra)}</span></div>}
                 <div className="summary-row big"><span className="l">Costo</span><span className="r">{L(c.costoUnit)}</span></div>
@@ -6671,6 +6671,11 @@ function Cotizador({ prendas = PRENDAS, payConfig = PAY_CONFIG_DEFAULT, tarifas,
               <div className="panel-body">
                 {!lados.length && <div className="cz-vacio">Agregá un diseño para calcular.</div>}
                 {lados.length > 0 && <>
+                  <div className="summary-row"><span className="l">Camiseta</span><span className="r mono">{L(cfg.base)}</span></div>
+                  {lados.map(ld => {
+                    const x = resumen.lados[ld];
+                    return <div key={ld} className="summary-row"><span className="l">Estampado {ld} · {Math.round(czArea(x))} cm²</span><span className="r mono">{L(czPrecioLado(x, cfg))}</span></div>;
+                  })}
                   <div className="summary-row"><span className="l">Sugerido</span><span className="r mono">{L(c.sugeridoUnit)}{q > 1 ? ' c/u' : ''}</span></div>
                   <label className="cz-campo" style={{ margin: '8px 0 12px' }}><span>Precio que vas a cobrar {q > 1 ? '(c/u)' : ''}</span>
                     <input className="input" type="number" min="0" placeholder={String(c.sugeridoUnit)} value={precioManual} onChange={e => setPrecioManual(e.target.value)} /></label>

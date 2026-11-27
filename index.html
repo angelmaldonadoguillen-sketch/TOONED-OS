@@ -1,4 +1,4 @@
-﻿<!doctype html><!-- TOONED OS v2.15 -->
+﻿<!doctype html><!-- TOONED OS v2.16 -->
 <html lang="es">
 <head>
 <meta charset="utf-8" />
@@ -1602,6 +1602,30 @@ b, strong { font-weight: 500; }
     }
     if (this.sel && this.capas[this.lado].indexOf(this.sel) >= 0) this.dibujarSeleccion(ctx, this.sel, z);
     this.mostrarMedidas();
+    this.sincronizarMedidas();
+  };
+
+  P.sincronizarMedidas = function () {
+    var cp = this.sel, an = $(this.root, '[data-tn-ancho]'), al = $(this.root, '[data-tn-alto]');
+    if (!cp || !an || !al) return;
+    if (document.activeElement !== an) an.value = cp.w.toFixed(1);
+    if (document.activeElement !== al) al.value = (cp.w * cp.asp).toFixed(1);
+  };
+
+  // Medida escrita a mano: se respeta la proporción y el centro del diseño
+  P.ponerMedida = function (campo, valor) {
+    var cp = this.sel; if (!cp) return;
+    var v = parseFloat(String(valor).replace(',', '.'));
+    if (!(v > 0)) { this.sincronizarMedidas(); return; }
+    var arriba = cp.cy - cp.w * cp.asp / 2;            // el borde de arriba queda fijo: crece hacia abajo
+    cp.w = this.limitarAncho(cp, campo === 'alto' ? v / cp.asp : v);
+    var alto = cp.w * cp.asp;
+    cp.cy = Math.min(Math.max(arriba, 0), Math.max(0, ZONA.h - alto)) + alto / 2;
+    cp.cx = Math.min(Math.max(cp.cx, cp.w / 2), ZONA.w - cp.w / 2);
+    var an = $(this.root, '[data-tn-ancho]'), al = $(this.root, '[data-tn-alto]');
+    if (an) an.value = cp.w.toFixed(1);
+    if (al) al.value = (cp.w * cp.asp).toFixed(1);
+    this.dibujar(); this.revisar(); this.actualizarPrecio(); this.guardar();
   };
 
   P.pintarCapa = function (x, cp, pxcm, ox, oy) {
@@ -1667,8 +1691,8 @@ b, strong { font-weight: 500; }
   P.mostrarMedidas = function () {
     var el = $(this.root, '[data-tn-medidas]');
     var c = this.caja(this.lado);
-    if (!c) { el.textContent = 'Tamaños: A4, A3 o personalizado hasta ' + ZONA.w + ' cm de ancho'; return; }
-    el.textContent = this.nombreLado(this.lado) + ': ' + c.w.toFixed(1) + ' × ' + c.h.toFixed(1) + ' cm · ' + this.etiquetaTam(c.tam);
+    if (!c) { el.textContent = 'Área imprimible: hasta ' + ZONA.w + ' × ' + ZONA.h + ' cm'; return; }
+    el.textContent = this.nombreLado(this.lado) + ': ' + c.w.toFixed(1) + ' × ' + c.h.toFixed(1) + ' cm · ' + Math.round(c.w * c.h) + ' cm²';
   };
 
   P.nombreLado = function (l) { return l === 'espalda' ? 'Espalda' : 'Frente'; };
@@ -1877,6 +1901,11 @@ b, strong { font-weight: 500; }
       var arr = self.capas[self.lado], i = arr.indexOf(cp);
       arr.splice(i, 1); arr.push(cp); self.dibujar(); self.guardar();
     }));
+    ['ancho', 'alto'].forEach(function (campo) {
+      var el = $(r, '[data-tn-' + campo + ']'); if (!el) return;
+      el.addEventListener('change', function () { self.ponerMedida(campo, el.value); });
+      el.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); el.blur(); } });
+    });
     $$(r, '[data-tn-tam]').forEach(function (b) {
       b.addEventListener('click', function () { self.encajar(b.getAttribute('data-tn-tam')); });
     });
@@ -6420,7 +6449,14 @@ const CZ_TOOLS_HTML = `
           <button type="button" class="tn-p__chip tn-p__chip--sm" data-tn-ubic="pecho-centro">Pecho centro</button>
           <button type="button" class="tn-p__chip tn-p__chip--sm" data-tn-ubic="frente-completo">Frente completo</button>
         </div>
-        <span class="tn-p__mini-etiqueta">Tamaño</span>
+        <span class="tn-p__mini-etiqueta">Tamaño en cm <em>· proporcional</em></span>
+        <div class="tn-p__medida">
+          <label class="tn-p__campo"><span class="tn-p__mini-etiqueta">Ancho</span>
+            <input class="tn-p__select" type="text" inputmode="decimal" autocomplete="off" data-tn-ancho aria-label="Ancho en centímetros"></label>
+          <span class="tn-p__por" aria-hidden="true">×</span>
+          <label class="tn-p__campo"><span class="tn-p__mini-etiqueta">Alto</span>
+            <input class="tn-p__select" type="text" inputmode="decimal" autocomplete="off" data-tn-alto aria-label="Alto en centímetros"></label>
+        </div>
         <div class="tn-p__fila" role="group" aria-label="Tamaño del diseño">
           <button type="button" class="tn-p__chip tn-p__chip--sm" data-tn-tam="A4">A4 · 21 × 30</button>
           <button type="button" class="tn-p__chip tn-p__chip--sm" data-tn-tam="A3">A3 · 30 × 42</button>
